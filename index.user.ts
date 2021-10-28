@@ -510,6 +510,7 @@ type EvaluatexType = (equation: string, variables ? : {
   let currentlyPressed: number[] = [];
   let idSet = false;
   let shadeIdSet = false;
+  let altTime = 0;
   let expressionPos = {
     x: 0,
     y: 0,
@@ -1974,7 +1975,11 @@ type EvaluatexType = (equation: string, variables ? : {
         }
       }
     }
-    if (e.altKey) {
+    if (e.key === 'Alt') {
+      altTime = Date.now();
+    }
+    if (e.altKey || (Date.now() - altTime) < 100) {
+      altTime = Date.now()
       const {
         keyCode,
       } = e;
@@ -2044,9 +2049,21 @@ type EvaluatexType = (equation: string, variables ? : {
           if (keyCode === 49) {
             newExpressionLatex = trySetVariable(newExpressionLatex, 'a_{1}', id, size * 0.3);
             newExpressionLatex = trySetVariable(newExpressionLatex, 'b_{1}', id, 0);
-          } else if ((keyCode > 52) && (keyCode < 55)) {
+          } else if (keyCode === 50) {
+            newExpressionLatex = trySetVariable(newExpressionLatex, 'e_{1}', id, size * 0.3);
+            newExpressionLatex = trySetVariable(newExpressionLatex, 'd_{1}', id, size * 0.3);
+          } else if (keyCode === 51) {
+            newExpressionLatex = trySetVariable(newExpressionLatex, 'e_{1}', id, size * 0.3);
+            newExpressionLatex = trySetVariable(newExpressionLatex, 'd_{1}', id, size * 0.3);
+          } else if (keyCode === 52) {
             newExpressionLatex = trySetVariable(newExpressionLatex, 'a_{1}', id, size * 0.3);
-            newExpressionLatex = trySetVariable(newExpressionLatex, 'b_{1}', id, size * 0.3);
+            newExpressionLatex = trySetVariable(newExpressionLatex, 'b_{1}', id, size * 0.2);
+          } else if (keyCode === 53) {
+            newExpressionLatex = trySetVariable(newExpressionLatex, 'a_{1}', id, size * 0.2);
+            newExpressionLatex = trySetVariable(newExpressionLatex, 'b_{1}', id, size * 0.2);
+          } else if (keyCode === 54) {
+            newExpressionLatex = trySetVariable(newExpressionLatex, 'a_{1}', id, size * 0.2);
+            newExpressionLatex = trySetVariable(newExpressionLatex, 'b_{1}', id, size * 0.2);
           } else if (keyCode === 55) {
             newExpressionLatex = trySetVariable(newExpressionLatex, 'x_{1a}', id, expressionPos.x - size * 0.2);
             newExpressionLatex = trySetVariable(newExpressionLatex, 'y_{1a}', id, expressionPos.y - size * 0.2);
@@ -2136,10 +2153,19 @@ type EvaluatexType = (equation: string, variables ? : {
       } else if (keyCode === 88) {
         if (Calc.selectedExpressionId.includes('_')) {
           const currId = Calc.selectedExpressionId.split('_')[0];
-          const idFilter = `${currId}_`;
-          let filteredExpressions = Calc.getExpressions();
-          filteredExpressions = filteredExpressions.filter((x) => x.id.startsWith(idFilter));
-          Calc.removeExpressions(filteredExpressions);
+          console.log(currId)
+          if (["shade", "final"].includes(currId)) {
+            let filteredExpressions = Calc.getExpressions();
+            const expression = filteredExpressions.find(x => x.id === Calc.selectedExpressionId)
+            if (expression) {
+              Calc.removeExpressions([expression]);
+            }
+          } else {
+            const idFilter = `${currId}_`;
+            let filteredExpressions = Calc.getExpressions();
+            filteredExpressions = filteredExpressions.filter((x) => x.id.startsWith(idFilter));
+            Calc.removeExpressions(filteredExpressions);
+          }
         }
       } else if (keyCode === 81) {
         if (Calc.selectedExpressionId.includes('_')) {
@@ -2251,6 +2277,7 @@ type EvaluatexType = (equation: string, variables ? : {
         }
       }
     }
+    e.preventDefault()
   }
 
   function keyDownHandler(e: KeyboardEvent) {
@@ -2414,6 +2441,12 @@ type EvaluatexType = (equation: string, variables ? : {
         if (upperId === lowerId) {
           fillInside(upperId)
         } else {
+          if (lowerId.includes('final_')) {
+            unfinalize(Calc.selectedExpressionId);                        
+          }
+          if (upperId.includes('final_')) {
+            unfinalize(Calc.selectedExpressionId);
+          }			
           fillIntersection(lowerId, upperId, axis)
         }
       }
