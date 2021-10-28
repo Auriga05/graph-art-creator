@@ -12,6 +12,17 @@
 // @require      https://cdn.jsdelivr.net/npm/evaluatex@2.2.0/dist/evaluatex.min.js
 // ==/UserScript==
 
+
+declare var Calc: CalcType;
+declare var evaluatex: EvaluatexType;
+declare var unsafeWindow: {
+  Conic: any
+  onload: () => void
+  document: any
+  toggleArtist: () => void
+  changeColor: () => void
+};
+
 interface SelectionObject {
   id: string
   pos: {
@@ -485,17 +496,8 @@ interface CalcType {
 type EvaluatexType = (equation: string, variables?: {[key: string]: number}) =>
   () => number | undefined
 
-(() => {
-  let Calc: CalcType;
-  let evaluatex: EvaluatexType;
-  let unsafeWindow: {
-    Conic: any
-    onload: () => void
-    document: any
-    toggleArtist: () => void
-    changeColor: () => void
-  };
 
+(() => {
   const selection: SelectionObject[] = [];
   let currentlyPressed: number[] = [];
   let idSet = false;

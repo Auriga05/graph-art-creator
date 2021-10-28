@@ -408,6 +408,14 @@ const expressionFormat = [
             latex: `f_{1x${String.fromCharCode(97 + c)}}(y)=${xExpression}`,
             types: ['x_expression'],
         })),
+        {
+            latex: 'y_{1ca}=m_{1}x_{1ca}+b_{1}',
+            types: ['helper_var'],
+        },
+        {
+            latex: 'y_{1cb}=m_{1}x_{1cb}+b_{1}',
+            types: ['helper_var'],
+        }
     ],
 ];
 const baseExpressionFormat = [];
@@ -1772,8 +1780,8 @@ for (let i = 0; i < expressionFormat.length; i++) {
                 }
                 const lowerConic = new Conic(lowerObject);
                 const upperConic = new Conic(upperObject);
-                const lowerBounds = lowerConic.getBounds();
-                const upperBounds = upperConic.getBounds();
+                const lowerBounds = lowerConic.getRealBounds();
+                const upperBounds = upperConic.getRealBounds();
                 const selectedComp = (slope > 1) ? 'y' : 'x';
                 if (selectedComp === 'y') {
                     let realMin = lowerBounds.xMin.value < upperBounds.xMin.value
@@ -1873,9 +1881,11 @@ for (let i = 0; i < expressionFormat.length; i++) {
         if (conicExpression) {
             const colorForm = $('#colorForm');
             if (colorForm) {
-                const data = colorForm.serialize();
-                console.log(data);
-                // Calc.setExpression(conicExpression);
+                const data = colorForm.serializeArray();
+                data.forEach((pair) => {
+                    conicExpression[pair.name] = pair.value;
+                });
+                Calc.setExpression(conicExpression);
             }
         }
     }
@@ -1884,11 +1894,11 @@ for (let i = 0; i < expressionFormat.length; i++) {
     unsafeWindow.onload = () => {
         const pillbox = unsafeWindow.document.querySelector('.dcg-overgraph-pillbox-elements');
         if (pillbox) {
-            pillbox.insertAdjacentHTML('<div class="dcg-artist-view-container"><div class="dcg-tooltip-hit-area-container"><div class="dcg-btn-flat-gray dcg-settings-pillbox dcg-action-settings" role="button" onclick=\'toggleArtist()\' style="background:#ededed"><i class="dcg-icon-wrench" aria-hidden="true"></i></div></div><div style="display: none"></div></div>');
+            pillbox.insertAdjacentHTML('beforeend', '<div class="dcg-artist-view-container"><div class="dcg-tooltip-hit-area-container"><div class="dcg-btn-flat-gray dcg-settings-pillbox dcg-action-settings" role="button" onclick=\'toggleArtist()\' style="background:#ededed"><i class="dcg-icon-wrench" aria-hidden="true"></i></div></div><div style="display: none"></div></div>');
         }
         const body = document.querySelector('.dcg-container');
         if (body) {
-            body.insertAdjacentHTML('beforeend', '<div id="artist" style="position: absolute; bottom: 5%; right: 5%; padding: 10px; border: 1px solid black; border-radius: 10px"><form id="colorForm" onSubmit="return changeColor()"><div> Color <input name="color" type="color"></div><div> Opacity <input name="opacity" type="number" min="0" max="1" value="0.4"></div><div><input type="button" value="Apply" onclick="changeColor()"></div></form></div>');
+            body.insertAdjacentHTML('beforeend', '<div id="artist" style="position: absolute; bottom: 5%; right: 5%; padding: 10px; border: 1px solid black; border-radius: 10px"><form id="colorForm" onSubmit="return changeColor()"><div> Color <input name="color" type="color"></div><div> Opacity <input name="fillOpacity" type="number" min="0" max="1" value="0.4"></div><div><input type="button" value="Apply" onclick="changeColor()"></div></form></div>');
         }
     };
 })();
