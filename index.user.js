@@ -161,6 +161,8 @@ for (let i = 0; i < expressionFormat.length; i++) {
 }
 (() => {
     const selection = [];
+    const conicAbbrev = ['C', 'HP', 'VP', 'E', 'HH', 'VH', 'LS'];
+    let lastSelectedId = '';
     let currentlyPressed = [];
     let idSet = false;
     let shadeIdSet = false;
@@ -169,6 +171,7 @@ for (let i = 0; i < expressionFormat.length; i++) {
     let globalVariablesObject = {};
     let id = 1;
     let shadeId = 1;
+    let currConicId = 0;
     let centerPoint = {
         x: Infinity,
         y: Infinity,
@@ -184,8 +187,17 @@ for (let i = 0; i < expressionFormat.length; i++) {
             .filter((x) => !x.id.includes('folder'))
             .map((x) => parseInt(x.id.split('_')[1], 10)), 0);
     }
+    function evaluateFunction(latex, values) {
+    }
     function getVariable(name) {
-        return parseFloat(globalVariablesObject[name]);
+        const split = name.split('(');
+        if (split.length === 1) {
+            return parseFloat(globalVariablesObject[name]);
+        }
+        if (split.length === 2) {
+            console.log(name);
+        }
+        throw Error('Bruh moment');
     }
     class LinkedVariable {
         constructor(reference, value) {
@@ -584,6 +596,7 @@ for (let i = 0; i < expressionFormat.length; i++) {
             const { conicType } = this;
             const currId = this.conicId;
             const { xMin, yMin, xMax, yMax } = this.getBounds();
+            console.log(this, this.getBounds());
             if (conicType === 0) {
                 const r2 = simplify(getVariable(`r_{${currId}}`) ** 2, 4);
                 latex = latex.replace(`r_{${currId}}^{2}`, r2);
@@ -1183,7 +1196,6 @@ for (let i = 0; i < expressionFormat.length; i++) {
             }
         }
     }
-    unsafeWindow.Conic = Conic;
     function createHorizontalHyperbola(_id, variables, bounds) {
         const { h: _h, k: _k, a: _a, b: _b } = variables;
         const h = _h;
@@ -1314,6 +1326,7 @@ for (let i = 0; i < expressionFormat.length; i++) {
     }
     function finalize(expressionId) {
         const currId = expressionId.split('_')[0];
+        const hasSameId = Calc.getExpressions().find((x) => x.id === `final_${currId}`);
         const idFilter = `${currId}_`;
         let filteredExpressions = Calc.getExpressions();
         filteredExpressions = filteredExpressions.filter((x) => x.id.startsWith(idFilter));
@@ -1332,7 +1345,13 @@ for (let i = 0; i < expressionFormat.length; i++) {
             }
         }
         conic.latex = conic.convertToStandard();
-        conic.id = `final_${conic.conicId}`;
+        if (hasSameId) {
+            conic.id = `final_${id}`;
+            id += 1;
+        }
+        else {
+            conic.id = `final_${conic.conicId}`;
+        }
         expressionList.push(conic.toExpression());
         Calc.setExpressions(expressionList);
         Calc.removeExpressions(filteredExpressions);
@@ -1398,19 +1417,37 @@ for (let i = 0; i < expressionFormat.length; i++) {
         id += 1;
         Calc.setExpressions(expressionsToSet);
     }
-    function freeze() {
+    function freeze(force) {
+        let newId = 0;
         const expressions = Calc.getExpressions();
         if (expressions.length !== 1) {
-            const conicExpressionsBase = expressions.filter((x) => x.id.includes('_0'));
+            let conicExpressionsNormal = [];
+            if (force) {
+                conicExpressionsNormal = expressions.filter((x) => !x.id.includes('_'));
+            }
+            const conicExpressionsBase = expressions.filter((x) => x.id.includes('_0') && !x.id.includes('final_'));
             const conicExpressionsFinal = expressions.filter((x) => x.id.includes('final_') && !x.id.includes('folder'));
             const conicExpressionsShade = expressions.filter((x) => x.id.includes('shade_') && !x.id.includes('folder'));
+            const conicExpressionsNormalLatex = conicExpressionsNormal.map((_conicExpression) => {
+                const conicExpression = _conicExpression;
+                conicExpression.id = `final_${newId}`;
+                newId += 1;
+                return conicExpression;
+            });
             const conicExpressionsBaseLatex = conicExpressionsBase.map((_conicExpression) => {
                 const conic = new Conic(_conicExpression);
-                conic.id = `final_${conic.conicId}`;
                 conic.latex = conic.convertToStandard();
+                conic.id = `final_${newId}`;
+                conic.conicId = newId;
+                newId += 1;
                 return conic.toExpression();
             });
-            const conicExpressionsFinalLatex = conicExpressionsFinal.map((_conicExpression) => _conicExpression);
+            const conicExpressionsFinalLatex = conicExpressionsFinal.map((_conicExpression) => {
+                const conicExpression = _conicExpression;
+                conicExpression.id = `final_${newId}`;
+                newId += 1;
+                return conicExpression;
+            });
             const conicExpressionsShadeLatex = conicExpressionsShade.map((_conicExpression) => {
                 const conicExpression = _conicExpression;
                 const latex = substituteParenthesis(conicExpression.latex);
@@ -1418,6 +1455,7 @@ for (let i = 0; i < expressionFormat.length; i++) {
                 return expression;
             });
             const latexAll = [
+                ...conicExpressionsNormalLatex,
                 ...conicExpressionsShadeLatex,
                 ...conicExpressionsBaseLatex,
                 ...conicExpressionsFinalLatex,
@@ -1578,6 +1616,21 @@ for (let i = 0; i < expressionFormat.length; i++) {
             Calc.setExpressions(expressionsToSet);
         }
     }
+    function setId() {
+        if (!idSet) {
+            const baseId = Math.max(0, Math.max(...Calc.getExpressions()
+                .filter((x) => x.id.includes('_0'))
+                .map((x) => parseInt(x.id.split('_')[0], 10))
+                .filter((x) => !Number.isNaN(x)))) + 1;
+            const finalId = Math.max(0, Math.max(...Calc.getExpressions()
+                .filter((x) => x.id.includes('final_'))
+                .map((x) => parseInt(x.id.split('_')[1], 10))
+                .filter((x) => !Number.isNaN(x)))) + 1;
+            console.log(baseId, finalId);
+            id = Math.max(baseId, finalId);
+            idSet = true;
+        }
+    }
     function shadeToBack() {
         const state = Calc.getState();
         state.expressions.list = state.expressions.list
@@ -1613,13 +1666,7 @@ for (let i = 0; i < expressionFormat.length; i++) {
     }
     function keyUpHandler(e) {
         updateVariables();
-        if (!idSet) {
-            id = Math.max(0, Math.max(...Calc.getExpressions()
-                .filter((x) => x.id.includes('_'))
-                .map((x) => parseInt(x.id.split('_')[0], 10))
-                .filter((x) => !Number.isNaN(x)))) + 1;
-            idSet = true;
-        }
+        setId();
         if (currentlyPressed.includes(e.keyCode)) {
             currentlyPressed = currentlyPressed.filter((key) => key !== e.keyCode);
         }
@@ -1629,7 +1676,7 @@ for (let i = 0; i < expressionFormat.length; i++) {
                 expressionToFront(Calc.selectedExpressionId);
             }
             if (key === 'F') { // F - Finalize
-                finalize(Calc.selectedExpressionId);
+                finalizeId(Calc.selectedExpressionId);
             }
         }
         if (e.key === 'Alt') {
@@ -1657,7 +1704,12 @@ for (let i = 0; i < expressionFormat.length; i++) {
                 resetSelection();
             }
             else if (keyCode === 48) {
-                freeze();
+                if (e.shiftKey) {
+                    freeze(true);
+                }
+                else {
+                    freeze(false);
+                }
             }
             else if (keyCode === 88) {
                 deleteById(Calc.selectedExpressionId);
@@ -1724,8 +1776,8 @@ for (let i = 0; i < expressionFormat.length; i++) {
             }
             shadingData.lastUpperBoundary.y = realMax;
             shadingData.lastLowerBoundary.y = realMin;
-            const bounds = generateBounds(realMin, { reference: null, value: -Infinity }, realMax, { reference: null, value: Infinity })
-                .reference;
+            const bounds = generateBounds(realMin, { reference: null, value: -Infinity }, realMax, { reference: null, value: Infinity }).reference;
+            console.log(bounds);
             const newExpressions = [];
             const lowerConicConverted = lowerConic.convertToYRelevant();
             const upperConicConverted = upperConic.convertToYRelevant();
@@ -1778,6 +1830,10 @@ for (let i = 0; i < expressionFormat.length; i++) {
         }
     }
     function mouseUpHandler(e) {
+        setId();
+        if (Calc.selectedExpressionId) {
+            lastSelectedId = Calc.selectedExpressionId;
+        }
         updateVariables();
         if (!shadeIdSet) {
             shadeId = getShadeId() + 1;
@@ -1833,21 +1889,42 @@ for (let i = 0; i < expressionFormat.length; i++) {
     }
     document.addEventListener('keydown', keyDownHandler, false);
     document.addEventListener('keyup', keyUpHandler, false);
-    document.addEventListener('mouseup', mouseUpHandler, false);
+    document.addEventListener('pointerup', mouseUpHandler, false);
     function toggleArtist() {
-        const x = unsafeWindow.document.querySelector('#artist');
+        const x = document.querySelector('#artist');
         if (x.style.display === 'none') {
             x.style.display = 'block';
         }
         else {
             x.style.display = 'none';
         }
+        const y = document.querySelector('#artist-container');
+        if (y.style.display === 'none') {
+            y.style.display = 'block';
+        }
+        else {
+            y.style.display = 'none';
+        }
+    }
+    function toggleButtons() {
+        const x = document.querySelector('#buttons');
+        if (x.style.display === 'none') {
+            x.style.display = 'block';
+        }
+        else {
+            x.style.display = 'none';
+        }
+        const y = document.querySelector('#artist-container');
+        if (y.style.display === 'none') {
+            y.style.display = 'block';
+        }
+        else {
+            y.style.display = 'none';
+        }
     }
     function changeColor() {
-        const x = unsafeWindow.document.querySelector('#artist');
         const expressions = Calc.getExpressions();
-        const conicId = Calc.selectedExpressionId;
-        const conicExpression = expressions.find((expression) => expression.id === conicId);
+        const conicExpression = expressions.find((expression) => expression.id === lastSelectedId);
         if (conicExpression) {
             const colorForm = $('#colorForm');
             if (colorForm) {
@@ -1859,16 +1936,44 @@ for (let i = 0; i < expressionFormat.length; i++) {
             }
         }
     }
-    unsafeWindow.toggleArtist = toggleArtist;
-    unsafeWindow.changeColor = changeColor;
+    function changeConicType() {
+        currConicId = (currConicId + 1) % 7;
+        const button = document.querySelector('#artist-button');
+        console.log('hi');
+        if (button) {
+            button.innerHTML = conicAbbrev[currConicId];
+        }
+    }
+    function createConicHandler() {
+        createConic(currConicId);
+    }
     unsafeWindow.onload = () => {
         const pillbox = unsafeWindow.document.querySelector('.dcg-overgraph-pillbox-elements');
+        console.log(pillbox);
         if (pillbox) {
-            pillbox.insertAdjacentHTML('beforeend', '<div class="dcg-artist-view-container"><div class="dcg-tooltip-hit-area-container"><div class="dcg-btn-flat-gray dcg-settings-pillbox dcg-action-settings" role="button" onclick=\'toggleArtist()\' style="background:#ededed"><i class="dcg-icon-wrench" aria-hidden="true"></i></div></div><div style="display: none"></div></div>');
+            pillbox.insertAdjacentHTML('beforeend', '<div id="artist-button-container"><div class="dcg-tooltip-hit-area-container"><div class="dcg-btn-flat-gray dcg-settings-pillbox dcg-action-settings" role="button" onclick=\'toggleArtist()\' style="background:#ededed"><i class="dcg-icon-wrench" aria-hidden="true"></i></div></div><div style="display: none"></div></div>');
+            pillbox.insertAdjacentHTML('beforeend', '<div id="artist-container" class="dcg-artist-view-container"></div>');
+            const artistContainer = unsafeWindow.document.querySelector('#artist-container');
+            if (artistContainer) {
+                artistContainer.insertAdjacentHTML('beforeend', `<div class="dcg-tooltip-hit-area-container dcg-hovered"> <div id="artist-button" class="dcg-btn-flat-gray dcg-settings-pillbox dcg-action-settings dcg-hovered" role="button" oncontextmenu="createConicHandler();return false;" onclick="changeConicType()" style="background:#ededed">${conicAbbrev[currConicId]}</div></div>`);
+                artistContainer.insertAdjacentHTML('beforeend', '<div class="dcg-tooltip-hit-area-container dcg-hovered"> <div class="dcg-btn-flat-gray dcg-settings-pillbox dcg-action-settings dcg-hovered" role="button" onclick="deleteById(Calc.selectedExpressionId)" style="background:#ededed">X</div></div>');
+                artistContainer.insertAdjacentHTML('beforeend', '<div class="dcg-tooltip-hit-area-container dcg-hovered"> <div class="dcg-btn-flat-gray dcg-settings-pillbox dcg-action-settings dcg-hovered" role="button" onclick="hideCropLines(Calc.selectedExpressionId)" style="background:#ededed">H</div></div>');
+                artistContainer.insertAdjacentHTML('beforeend', '<div class="dcg-tooltip-hit-area-container dcg-hovered"> <div class="dcg-btn-flat-gray dcg-settings-pillbox dcg-action-settings dcg-hovered" role="button" onclick="changeCropMode(Calc.selectedExpressionId)" style="background:#ededed">Q</div></div>');
+                artistContainer.insertAdjacentHTML('beforeend', '<div class="dcg-tooltip-hit-area-container dcg-hovered"> <div class="dcg-btn-flat-gray dcg-settings-pillbox dcg-action-settings dcg-hovered" role="button" onclick="finalizeId(Calc.selectedExpressionId)" style="background:#ededed">F</div></div>');
+                artistContainer.insertAdjacentHTML('beforeend', '<div class="dcg-tooltip-hit-area-container dcg-hovered"> <div class="dcg-btn-flat-gray dcg-settings-pillbox dcg-action-settings dcg-hovered" role="button" oncontextmenu="freeze(false);return false;" style="background:#ededed">S</div></div>');
+            }
         }
-        const body = document.querySelector('.dcg-container');
+        const body = document.querySelector('.dcg-grapher');
         if (body) {
             body.insertAdjacentHTML('beforeend', '<div id="artist" style="position: absolute; bottom: 5%; right: 5%; padding: 10px; border: 1px solid black; border-radius: 10px"><form id="colorForm" onSubmit="return changeColor()"><div> Color <input name="color" type="color"></div><div> Opacity <input name="fillOpacity" type="number" min="0" max="1" value="0.4"></div><div><input type="button" value="Apply" onclick="changeColor()"></div></form></div>');
         }
     };
+    unsafeWindow.idSet = idSet;
+    unsafeWindow.id = id;
+    unsafeWindow.Conic = Conic;
+    unsafeWindow.toggleButtons = toggleButtons;
+    unsafeWindow.changeColor = changeColor;
+    unsafeWindow.changeConicType = changeConicType;
+    unsafeWindow.createConicHandler = createConicHandler;
+    unsafeWindow.toggleArtist = toggleArtist;
 })();
