@@ -2,11 +2,9 @@ node_modules
 .eslintignore
 .eslintrc.yml
 index_old.js
-index.ts
 package-lock.json
 package.json
 test.html
 tsconfig.json
 index.user.ts
-index.js
 evaluatex.js
