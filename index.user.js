@@ -2,7 +2,7 @@
 // ==UserScript==
 // @name         Precal thing
 // @namespace    http://tampermonkey.net/
-// @version      0.1
+// @version      0.1.1
 // @description  precal thing
 // @author       You (not Watanabe)
 // @match        https://www.desmos.com/calculator*
@@ -214,7 +214,7 @@ let MyCalc;
     let altTime = 0;
     let expressionPos = { x: 0, y: 0 };
     let globalVariablesObject = {};
-    let id = 1;
+    let globalId = 1;
     let shadeId = 1;
     let currConicId = 0;
     let centerPoint = {
@@ -1184,7 +1184,7 @@ let MyCalc;
             newExpressionLatex = newExpressionLatex.replaceAll('_{1', `_{${conicId}`);
             if (doesIntersect(newExpression.types, ['var'])) {
                 const [variable] = newExpressionLatex.split('=');
-                const value = globalVariablesObject[toId(variable, id)];
+                const value = globalVariablesObject[toId(variable, conicId)];
                 newExpressionLatex = `${variable}=${value}`;
             }
             if (conicType !== 6) {
@@ -1271,20 +1271,20 @@ let MyCalc;
                     const yMin = Math.max(-Infinity, _yMin);
                     const yMax = Math.min(k, _yMax);
                     if (b < 0) { // horizontal hyperbola
-                        createWithBounds(id, 4, { h, a: Math.sqrt(Math.abs(b2)), k, b: Math.sqrt(Math.abs(a2)) }, { xMin, xMax, yMin, yMax });
+                        createWithBounds(globalId, 4, { h, a: Math.sqrt(Math.abs(b2)), k, b: Math.sqrt(Math.abs(a2)) }, { xMin, xMax, yMin, yMax });
                     }
                     else if (b > 0) { // vertical hyperbola
-                        createWithBounds(id, 5, { h, a: Math.sqrt(Math.abs(a2)), k, b: Math.sqrt(Math.abs(b2)) }, { xMin, xMax, yMin, yMax });
+                        createWithBounds(globalId, 5, { h, a: Math.sqrt(Math.abs(a2)), k, b: Math.sqrt(Math.abs(b2)) }, { xMin, xMax, yMin, yMax });
                     }
                 }
                 else if (a > 0) { // up
                     const yMin = Math.max(k, _yMin);
                     const yMax = Math.min(Infinity, _yMax);
                     if (b < 0) { // horizontal hyperbola
-                        createWithBounds(id, 4, { h, a: Math.sqrt(Math.abs(b2)), k, b: Math.sqrt(Math.abs(a2)) }, { xMin, xMax, yMin, yMax });
+                        createWithBounds(globalId, 4, { h, a: Math.sqrt(Math.abs(b2)), k, b: Math.sqrt(Math.abs(a2)) }, { xMin, xMax, yMin, yMax });
                     }
                     else if (b > 0) { // vertical parabola
-                        createWithBounds(id, 5, { h, a: Math.sqrt(Math.abs(a2)), k, b: Math.sqrt(Math.abs(b2)) }, { xMin, xMax, yMin, yMax });
+                        createWithBounds(globalId, 5, { h, a: Math.sqrt(Math.abs(a2)), k, b: Math.sqrt(Math.abs(b2)) }, { xMin, xMax, yMin, yMax });
                     }
                 }
             }
@@ -1322,8 +1322,8 @@ let MyCalc;
         }
         conic.latex = conic.convertToStandard();
         if (hasSameId) {
-            conic.id = `final_${id}`;
-            id += 1;
+            conic.id = `final_${globalId}`;
+            globalId += 1;
         }
         else {
             conic.id = `final_${conic.conicId}`;
@@ -1340,43 +1340,43 @@ let MyCalc;
         const verticalSize = (coordinates.top - coordinates.bottom);
         const horizontalSize = (coordinates.right - coordinates.left);
         const size = Math.min(verticalSize, horizontalSize);
-        setVariable(`h_{${id}}`, expressionPos.x);
-        setVariable(`k_{${id}}`, expressionPos.y);
+        setVariable(`h_{${globalId}}`, expressionPos.x);
+        setVariable(`k_{${globalId}}`, expressionPos.y);
         if (conicType === 0) {
-            setVariable(`a_{${id}}`, size * 0.3);
-            setVariable(`b_{${id}}`, 0);
+            setVariable(`a_{${globalId}}`, size * 0.3);
+            setVariable(`b_{${globalId}}`, 0);
         }
         else if (conicType === 1) {
-            setVariable(`e_{${id}}`, size * 0.3);
-            setVariable(`d_{${id}}`, size * 0.3);
+            setVariable(`e_{${globalId}}`, size * 0.3);
+            setVariable(`d_{${globalId}}`, size * 0.3);
         }
         else if (conicType === 2) {
-            setVariable(`e_{${id}}`, size * 0.3);
-            setVariable(`d_{${id}}`, size * 0.3);
+            setVariable(`e_{${globalId}}`, size * 0.3);
+            setVariable(`d_{${globalId}}`, size * 0.3);
         }
         else if (conicType === 3) {
-            setVariable(`a_{${id}}`, size * 0.3);
-            setVariable(`b_{${id}}`, size * 0.2);
+            setVariable(`a_{${globalId}}`, size * 0.3);
+            setVariable(`b_{${globalId}}`, size * 0.2);
         }
         else if (conicType === 4) {
-            setVariable(`a_{${id}}`, size * 0.2);
-            setVariable(`b_{${id}}`, size * 0.2);
+            setVariable(`a_{${globalId}}`, size * 0.2);
+            setVariable(`b_{${globalId}}`, size * 0.2);
         }
         else if (conicType === 5) {
-            setVariable(`a_{${id}}`, size * 0.2);
-            setVariable(`b_{${id}}`, size * 0.2);
+            setVariable(`a_{${globalId}}`, size * 0.2);
+            setVariable(`b_{${globalId}}`, size * 0.2);
         }
         else if (conicType === 6) {
-            setVariable(`x_{${id}a}`, expressionPos.x - size * 0.2);
-            setVariable(`y_{${id}a}`, expressionPos.y - size * 0.2);
-            setVariable(`x_{${id}b}`, expressionPos.x + size * 0.2);
-            setVariable(`y_{${id}b}`, expressionPos.y + size * 0.2);
+            setVariable(`x_{${globalId}a}`, expressionPos.x - size * 0.2);
+            setVariable(`y_{${globalId}a}`, expressionPos.y - size * 0.2);
+            setVariable(`x_{${globalId}b}`, expressionPos.x + size * 0.2);
+            setVariable(`y_{${globalId}b}`, expressionPos.y + size * 0.2);
         }
         if (conicType !== 6) {
-            setVariable(`x_{${id}cam}`, -size * 0.4);
-            setVariable(`y_{${id}cam}`, -size * 0.4);
-            setVariable(`x_{${id}cbm}`, size * 0.4);
-            setVariable(`y_{${id}cbm}`, size * 0.4);
+            setVariable(`x_{${globalId}cam}`, -size * 0.4);
+            setVariable(`y_{${globalId}cam}`, -size * 0.4);
+            setVariable(`x_{${globalId}cbm}`, size * 0.4);
+            setVariable(`y_{${globalId}cbm}`, size * 0.4);
         }
         for (let i = 0; i < expression.length; i++) {
             const newExpression = expression[i];
@@ -1386,20 +1386,20 @@ let MyCalc;
                     newExpressionLatex += '\\left\\{x_{1ca}<x<x_{1cb}\\right\\}\\left\\{y_{1ca}<y<y_{1cb}\\right\\}';
                 }
             }
-            newExpressionLatex = newExpressionLatex.replace(/_\{\d+([a-z]*)}/g, `_{${id}$1}`);
+            newExpressionLatex = newExpressionLatex.replace(/_\{\d+([a-z]*)}/g, `_{${globalId}$1}`);
             if (doesIntersect(newExpression.types, ['var'])) {
                 const [variable] = newExpressionLatex.split('=');
-                const value = globalVariablesObject[toId(variable, id)];
+                const value = globalVariablesObject[toId(variable, globalId)];
                 newExpressionLatex = `${variable}=${value}`;
             }
             const hidden = doesIntersect(expression[i].types, ['x_expression', 'y_expression']);
-            expressionsToSet.push({ id: `${id.toString()}_${i}`,
+            expressionsToSet.push({ id: `${globalId.toString()}_${i}`,
                 latex: newExpressionLatex,
                 color: 'BLACK',
                 hidden,
                 type: 'expression' });
         }
-        id += 1;
+        globalId += 1;
         MyCalc.setExpressions(expressionsToSet);
     }
     function freeze(force) {
@@ -1610,7 +1610,7 @@ let MyCalc;
                 .map((x) => parseInt(x.id.split('_')[1], 10))
                 .filter((x) => !Number.isNaN(x)))) + 1;
             console.log(baseId, finalId);
-            id = Math.max(baseId, finalId);
+            globalId = Math.max(baseId, finalId);
             idSet = true;
         }
     }
@@ -1931,7 +1931,7 @@ let MyCalc;
         load();
     })();
     unsafeWindow.idSet = idSet;
-    unsafeWindow.id = id;
+    unsafeWindow.id = globalId;
     unsafeWindow.Conic = Conic;
     unsafeWindow.changeColor = changeColor;
     unsafeWindow.changeConicType = changeConicType;
