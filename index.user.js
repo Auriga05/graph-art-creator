@@ -10,12 +10,11 @@
 // @grant        unsafeWindow
 // @updateURL    https://github.com/Auriga05/graph-art-creator/raw/master/index.user.js
 // @downloadURL  https://github.com/Auriga05/graph-art-creator/raw/master/index.user.js
-// @require      https://raw.githubusercontent.com/EastDesire/jscolor/master/jscolor.js
 // @require      https://code.jquery.com/jquery-3.5.1.slim.min.js
 // @require      https://cdn.jsdelivr.net/npm/evaluatex@2.2.0/dist/evaluatex.min.js
-// @require      https://raw.githubusercontent.com/john-doherty/long-press-event/master/dist/long-press-event.min.js
 // ==/UserScript==
-const defaultExpressionFormat = [{ latex: '\\left(x_{1cb},y_{1ca}+\\left(y_{1cb}-y_{1ca}\\right)t\\right)', types: ['segment', 'delete', 'hide', 'y'] },
+const defaultExpressionFormat = [
+    { latex: '\\left(x_{1cb},y_{1ca}+\\left(y_{1cb}-y_{1ca}\\right)t\\right)', types: ['segment', 'delete', 'hide', 'y'] },
     { latex: '\\left(x_{1ca},y_{1ca}+\\left(y_{1cb}-y_{1ca}\\right)t\\right)', types: ['segment', 'delete', 'hide', 'y'] },
     { latex: '\\left(x_{1ca}+\\left(x_{1cb}-x_{1ca}\\right)t,y_{1ca}\\right)', types: ['segment', 'delete', 'hide', 'x'] },
     { latex: '\\left(x_{1ca}+\\left(x_{1cb}-x_{1ca}\\right)t,y_{1cb}\\right)', types: ['segment', 'delete', 'hide', 'x'] },
@@ -29,15 +28,6 @@ const defaultExpressionFormat = [{ latex: '\\left(x_{1cb},y_{1ca}+\\left(y_{1cb}
     { latex: 'y_{1cam}=0', types: ['var', 'delete'] },
     { latex: 'x_{1cbm}=0', types: ['var', 'delete'] },
     { latex: 'y_{1cbm}=0', types: ['var', 'delete'] },
-];
-const compatibility = [
-    ['x', 'y'],
-    ['x'],
-    ['y'],
-    ['x', 'y'],
-    ['x'],
-    ['y'],
-    ['x', 'y'],
 ];
 const yExpressions = [
     ['k_{1}-\\sqrt{r_{1}^{2}-\\left(x-h_{1}\\right)^{2}}', 'k_{1}+\\sqrt{r_{1}^{2}-\\left(x-h_{1}\\right)^{2}}'],
@@ -59,82 +49,82 @@ const xExpressions = [
 ];
 const expressionFormat = [
     [
-        { latex: '\\left(x-h_{1}\\right)^{2}+\\left(y-k_{1}\\right)^{2}=r_{1}^{2}', types: ['conic'] },
+        { latex: '\\left(x-h_{1}\\right)^{2}+\\left(y-k_{1}\\right)^{2}=r_{1}^{2}', types: ['conic'], name: 'conic' },
         { latex: '\\left(h_{1},k_{1}\\right)', types: ['point', 'hide'] },
         { latex: '\\left(h_{1}+a_{1},k_{1}+b_{1}\\right)', types: ['point', 'hide'] },
-        { latex: 'r_{1}=\\sqrt{a_{1}^{2}+b_{1}^{2}}', types: ['helper_var'] },
-        { latex: 'h_{1}=0', types: ['var'] },
-        { latex: 'k_{1}=0', types: ['var'] },
-        { latex: 'a_{1}=1', types: ['var'] },
-        { latex: 'b_{1}=0', types: ['var'] },
+        { latex: 'r_{1}=\\sqrt{a_{1}^{2}+b_{1}^{2}}', types: ['helper_var'], name: 'r' },
+        { latex: 'h_{1}=0', types: ['var'], name: 'h' },
+        { latex: 'k_{1}=0', types: ['var'], name: 'k' },
+        { latex: 'a_{1}=1', types: ['var'], name: 'a' },
+        { latex: 'b_{1}=0', types: ['var'], name: 'b' },
         ...defaultExpressionFormat,
-        ...yExpressions[0].map((yExpression, c) => ({ latex: `f_{1y${String.fromCharCode(97 + c)}}(x)=${yExpression}`, types: ['y_expression'] })),
-        ...xExpressions[0].map((xExpression, c) => ({ latex: `f_{1x${String.fromCharCode(97 + c)}}(y)=${xExpression}`, types: ['x_expression'] })),
+        ...yExpressions[0].map((yExpression, c) => ({ latex: `f_{1y${String.fromCharCode(97 + c)}}(x)=${yExpression}`, types: ['y_expression'], name: `f_{1y${String.fromCharCode(97 + c)}}` })),
+        ...xExpressions[0].map((xExpression, c) => ({ latex: `f_{1x${String.fromCharCode(97 + c)}}(y)=${xExpression}`, types: ['x_expression'], name: `f_{1x${String.fromCharCode(97 + c)}}` })),
     ],
     [
         { latex: '\\left(y-k_{1}\\right)^{2}=4c_{1}\\left(x-h_{1}\\right)', types: ['conic'] },
         { latex: '\\left(h_{1},k_{1}\\right)', types: ['point', 'hide'] },
         { latex: '\\left(h_{1}+d_{1},k_{1}+e_{1}\\right)', types: ['point', 'hide'] },
-        { latex: 'k_{1}=0', types: ['helper_var'] },
-        { latex: 'h_{1}=0', types: ['var'] },
-        { latex: 'e_{1}=1', types: ['var'] },
-        { latex: 'd_{1}=1', types: ['var'] },
-        { latex: 'c_{1}=\\frac{e_{1}^{2}}{4d_{1}}', types: ['var'] },
+        { latex: 'k_{1}=0', types: ['helper_var'], name: 'k' },
+        { latex: 'h_{1}=0', types: ['var'], name: 'h' },
+        { latex: 'e_{1}=1', types: ['var'], name: 'e' },
+        { latex: 'd_{1}=1', types: ['var'], name: 'd' },
+        { latex: 'c_{1}=\\frac{e_{1}^{2}}{4d_{1}}', types: ['helper_var'], name: 'c' },
         ...defaultExpressionFormat,
-        ...yExpressions[1].map((yExpression, c) => ({ latex: `f_{1y${String.fromCharCode(97 + c)}}(x)=${yExpression}`, types: ['y_expression'] })),
-        ...xExpressions[1].map((xExpression, c) => ({ latex: `f_{1x${String.fromCharCode(97 + c)}}(y)=${xExpression}`, types: ['x_expression'] })),
+        ...yExpressions[1].map((yExpression, c) => ({ latex: `f_{1y${String.fromCharCode(97 + c)}}(x)=${yExpression}`, types: ['y_expression'], name: `f_{1y${String.fromCharCode(97 + c)}}` })),
+        ...xExpressions[1].map((xExpression, c) => ({ latex: `f_{1x${String.fromCharCode(97 + c)}}(y)=${xExpression}`, types: ['x_expression'], name: `f_{1x${String.fromCharCode(97 + c)}}` })),
     ],
     [
         { latex: '\\left(x-h_{1}\\right)^{2}=4c_{1}\\left(y-k_{1}\\right)', types: ['conic'] },
         { latex: '\\left(h_{1},k_{1}\\right)', types: ['point', 'hide'] },
         { latex: '\\left(h_{1}+e_{1},k_{1}+d_{1}\\right)', types: ['point', 'hide'] },
-        { latex: 'k_{1}=0', types: ['var'] },
-        { latex: 'h_{1}=0', types: ['var'] },
-        { latex: 'e_{1}=1', types: ['var'] },
-        { latex: 'd_{1}=1', types: ['var'] },
-        { latex: 'c_{1}=\\frac{e_{1}^{2}}{4d_{1}}', types: ['helper_var'] },
+        { latex: 'k_{1}=0', types: ['var'], name: 'k' },
+        { latex: 'h_{1}=0', types: ['var'], name: 'h' },
+        { latex: 'e_{1}=1', types: ['var'], name: 'e' },
+        { latex: 'd_{1}=1', types: ['var'], name: 'd' },
+        { latex: 'c_{1}=\\frac{e_{1}^{2}}{4d_{1}}', types: ['helper_var'], name: 'c' },
         ...defaultExpressionFormat,
-        ...yExpressions[2].map((yExpression, c) => ({ latex: `f_{1y${String.fromCharCode(97 + c)}}(x)=${yExpression}`, types: ['y_expression'] })),
-        ...xExpressions[2].map((xExpression, c) => ({ latex: `f_{1x${String.fromCharCode(97 + c)}}(y)=${xExpression}`, types: ['x_expression'] })),
+        ...yExpressions[2].map((yExpression, c) => ({ latex: `f_{1y${String.fromCharCode(97 + c)}}(x)=${yExpression}`, types: ['y_expression'], name: `f_{1y${String.fromCharCode(97 + c)}}` })),
+        ...xExpressions[2].map((xExpression, c) => ({ latex: `f_{1x${String.fromCharCode(97 + c)}}(y)=${xExpression}`, types: ['x_expression'], name: `f_{1x${String.fromCharCode(97 + c)}}` })),
     ],
     [
         { latex: '\\frac{\\left(x-h_{1}\\right)^{2}}{a_{1}^{2}}+\\frac{\\left(y-k_{1}\\right)^{2}}{b_{1}^{2}}=1', types: ['conic'] },
         { latex: '\\left(h_{1},k_{1}\\right)', types: ['point', 'hide'] },
         { latex: '\\left(h_{1}+a_{1},k_{1}\\right)', types: ['point', 'hide'] },
         { latex: '\\left(h_{1},k_{1}+b_{1}\\right)', types: ['point', 'hide'] },
-        { latex: 'k_{1}=0', types: ['var'] },
-        { latex: 'h_{1}=0', types: ['var'] },
-        { latex: 'a_{1}=1', types: ['var'] },
-        { latex: 'b_{1}=1', types: ['var'] },
+        { latex: 'k_{1}=0', types: ['var'], name: 'h' },
+        { latex: 'h_{1}=0', types: ['var'], name: 'k' },
+        { latex: 'a_{1}=1', types: ['var'], name: 'a' },
+        { latex: 'b_{1}=1', types: ['var'], name: 'b' },
         ...defaultExpressionFormat,
-        ...yExpressions[3].map((yExpression, c) => ({ latex: `f_{1y${String.fromCharCode(97 + c)}}(x)=${yExpression}`, types: ['y_expression'] })),
-        ...xExpressions[3].map((xExpression, c) => ({ latex: `f_{1x${String.fromCharCode(97 + c)}}(y)=${xExpression}`, types: ['x_expression'] })),
+        ...yExpressions[3].map((yExpression, c) => ({ latex: `f_{1y${String.fromCharCode(97 + c)}}(x)=${yExpression}`, types: ['y_expression'], name: `f_{1y${String.fromCharCode(97 + c)}}` })),
+        ...xExpressions[3].map((xExpression, c) => ({ latex: `f_{1x${String.fromCharCode(97 + c)}}(y)=${xExpression}`, types: ['x_expression'], name: `f_{1x${String.fromCharCode(97 + c)}}` })),
     ],
     [
         { latex: '\\frac{\\left(x-h_{1}\\right)^{2}}{a_{1}^{2}}-\\frac{\\left(y-k_{1}\\right)^{2}}{b_{1}^{2}}=1', types: ['conic'] },
         { latex: '\\left(h_{1},k_{1}\\right)', types: ['point', 'hide'] },
         { latex: '\\left(h_{1}+a_{1},k_{1}\\right)', types: ['point', 'hide'] },
         { latex: '\\left(h_{1}+\\sqrt{2}a_{1},k_{1}+b_{1}\\right)', types: ['point', 'hide'] },
-        { latex: 'k_{1}=0', types: ['var'] },
-        { latex: 'h_{1}=0', types: ['var'] },
-        { latex: 'a_{1}=1', types: ['var'] },
-        { latex: 'b_{1}=1', types: ['var'] },
+        { latex: 'k_{1}=0', types: ['var'], name: 'k' },
+        { latex: 'h_{1}=0', types: ['var'], name: 'h' },
+        { latex: 'a_{1}=1', types: ['var'], name: 'a' },
+        { latex: 'b_{1}=1', types: ['var'], name: 'b' },
         ...defaultExpressionFormat,
-        ...yExpressions[4].map((yExpression, c) => ({ latex: `f_{1y${String.fromCharCode(97 + c)}}(x)=${yExpression}`, types: ['y_expression'] })),
-        ...xExpressions[4].map((xExpression, c) => ({ latex: `f_{1x${String.fromCharCode(97 + c)}}(y)=${xExpression}`, types: ['x_expression'] })),
+        ...yExpressions[4].map((yExpression, c) => ({ latex: `f_{1y${String.fromCharCode(97 + c)}}(x)=${yExpression}`, types: ['y_expression'], name: `f_{1y${String.fromCharCode(97 + c)}}` })),
+        ...xExpressions[4].map((xExpression, c) => ({ latex: `f_{1x${String.fromCharCode(97 + c)}}(y)=${xExpression}`, types: ['x_expression'], name: `f_{1x${String.fromCharCode(97 + c)}}` })),
     ],
     [
         { latex: '\\frac{\\left(y-k_{1}\\right)^{2}}{a_{1}^{2}}-\\frac{\\left(x-h_{1}\\right)^{2}}{b_{1}^{2}}=1', types: ['conic'] },
         { latex: '\\left(h_{1},k_{1}\\right)', types: ['point', 'hide'] },
         { latex: '\\left(h_{1},k_{1}+a_{1}\\right)', types: ['point', 'hide'] },
         { latex: '\\left(h_{1}+b_{1},k_{1}+\\sqrt{2}a_{1}\\right)', types: ['point', 'hide'] },
-        { latex: 'k_{1}=0', types: ['var'] },
-        { latex: 'h_{1}=0', types: ['var'] },
-        { latex: 'a_{1}=1', types: ['var'] },
-        { latex: 'b_{1}=1', types: ['var'] },
+        { latex: 'k_{1}=0', types: ['var'], name: 'k' },
+        { latex: 'h_{1}=0', types: ['var'], name: 'h' },
+        { latex: 'a_{1}=1', types: ['var'], name: 'a' },
+        { latex: 'b_{1}=1', types: ['var'], name: 'b' },
         ...defaultExpressionFormat,
-        ...yExpressions[5].map((yExpression, c) => ({ latex: `f_{1y${String.fromCharCode(97 + c)}}(x)=${yExpression}`, types: ['y_expression'] })),
-        ...xExpressions[5].map((xExpression, c) => ({ latex: `f_{1x${String.fromCharCode(97 + c)}}(y)=${xExpression}`, types: ['x_expression'] })),
+        ...yExpressions[5].map((yExpression, c) => ({ latex: `f_{1y${String.fromCharCode(97 + c)}}(x)=${yExpression}`, types: ['y_expression'], name: `f_{1y${String.fromCharCode(97 + c)}}` })),
+        ...xExpressions[5].map((xExpression, c) => ({ latex: `f_{1x${String.fromCharCode(97 + c)}}(y)=${xExpression}`, types: ['x_expression'], name: `f_{1x${String.fromCharCode(97 + c)}}` })),
     ],
     [
         { latex: 'y=m_{1}x+b_{1}\\left\\{x_{1ca}<x<x_{1cb}\\right\\}', types: ['conic'] },
@@ -144,21 +134,76 @@ const expressionFormat = [
         { latex: 'x_{1cb}=\\max\\left(x_{1a},x_{1b}\\right)', types: ['helper_var'] },
         { latex: 'm_{1}=\\frac{\\left(y_{1b}-y_{1a}\\right)}{\\left(x_{1b}-x_{1a}\\right)}', types: ['helper_var'] },
         { latex: 'b_{1}=y_{1a}-\\frac{\\left(y_{1b}-y_{1a}\\right)x_{1a}}{\\left(x_{1b}-x_{1a}\\right)}', types: ['helper_var'] },
-        { latex: 'y_{1a}=0', types: ['var'] },
-        { latex: 'y_{1b}=1', types: ['var'] },
-        { latex: 'x_{1a}=0', types: ['var'] },
-        { latex: 'x_{1b}=1', types: ['var'] },
-        ...yExpressions[6].map((yExpression, c) => ({ latex: `f_{1y${String.fromCharCode(97 + c)}}(x)=${yExpression}`, types: ['y_expression'] })),
-        ...xExpressions[6].map((xExpression, c) => ({ latex: `f_{1x${String.fromCharCode(97 + c)}}(y)=${xExpression}`, types: ['x_expression'] })),
+        { latex: 'y_{1a}=0', types: ['var'], name: 'ya' },
+        { latex: 'y_{1b}=1', types: ['var'], name: 'yb' },
+        { latex: 'x_{1a}=0', types: ['var'], name: 'xa' },
+        { latex: 'x_{1b}=1', types: ['var'], name: 'xb' },
+        ...yExpressions[6].map((yExpression, c) => ({ latex: `f_{1y${String.fromCharCode(97 + c)}}(x)=${yExpression}`, types: ['y_expression'], name: `f_{1y${String.fromCharCode(97 + c)}}` })),
+        ...xExpressions[6].map((xExpression, c) => ({ latex: `f_{1x${String.fromCharCode(97 + c)}}(y)=${xExpression}`, types: ['x_expression'], name: `f_{1x${String.fromCharCode(97 + c)}}` })),
         { latex: 'y_{1ca}=m_{1}x_{1ca}+b_{1}', types: ['helper_var'] },
         { latex: 'y_{1cb}=m_{1}x_{1cb}+b_{1}', types: ['helper_var'] },
     ],
 ];
+const expressionNames = expressionFormat.map((expressionList) => {
+    const x = {};
+    expressionList.forEach((latexExpression, expressionId) => {
+        if (latexExpression.name) {
+            x[latexExpression.name] = expressionId;
+        }
+    });
+    return x;
+});
 const baseExpressionFormat = [];
 for (let i = 0; i < expressionFormat.length; i++) {
     const expression = expressionFormat[i];
     baseExpressionFormat.push(expression[0].latex);
 }
+function isConic(expression) {
+    return expression.id.endsWith('_0');
+}
+class MyCalcClass {
+    constructor(_Calc) {
+        this.Calc = _Calc;
+        this.Controller = _Calc.controller;
+    }
+    getSelected() {
+        return this.getExpression(this.selectedExpressionId);
+    }
+    getExpression(_id) {
+        return this.Controller.getItemModel(_id);
+    }
+    getExpressions() {
+        return this.Calc.getExpressions();
+    }
+    get expressionAnalysis() {
+        return this.Calc.expressionAnalysis;
+    }
+    get selectedExpressionId() {
+        return this.Calc.selectedExpressionId;
+    }
+    removeExpressions(expressions) {
+        this.Calc.removeExpressions(expressions);
+    }
+    setExpressions(expressions) {
+        this.Calc.setExpressions(expressions);
+    }
+    setExpression(expression) {
+        this.Calc.setExpression(expression);
+    }
+    pixelsToMath(point) {
+        return this.Calc.pixelsToMath(point);
+    }
+    get graphpaperBounds() {
+        return this.Calc.graphpaperBounds;
+    }
+    getState() {
+        return this.Calc.getState();
+    }
+    setState(value) {
+        return this.Calc.setState(value);
+    }
+}
+let MyCalc;
 (() => {
     const selection = [];
     const conicAbbrev = ['C', 'HP', 'VP', 'E', 'HH', 'VH', 'LS'];
@@ -181,13 +226,15 @@ for (let i = 0; i < expressionFormat.length; i++) {
         y: Infinity,
     };
     function getShadeId() {
-        return Math.max(...Calc
+        return Math.max(...MyCalc
             .getExpressions()
-            .filter((x) => x.id.includes('shade_'))
+            .filter((x) => x.id.startsWith('shade_'))
             .filter((x) => !x.id.includes('folder'))
             .map((x) => parseInt(x.id.split('_')[1], 10)), 0);
     }
-    function evaluateFunction(latex, values) {
+    function simplify(_number, decimalPlaces) {
+        return parseFloat(_number.toFixed(decimalPlaces))
+            .toString();
     }
     function getVariable(name) {
         const split = name.split('(');
@@ -199,31 +246,48 @@ for (let i = 0; i < expressionFormat.length; i++) {
         }
         throw Error('Bruh moment');
     }
+    function setVariable(variable, _value) {
+        let value = _value;
+        if (typeof value === 'number') {
+            value = value.toString();
+        }
+        globalVariablesObject[variable] = value;
+    }
     class LinkedVariable {
-        constructor(reference, value) {
+        constructor(reference, _value) {
             if (typeof reference === 'number') {
                 this.reference = null;
-                this.value = reference;
+                this._value = reference;
             }
             else {
                 this.reference = reference;
-                if (value === undefined) {
+                if (_value === undefined) {
                     if (reference != null) {
-                        this.value = getVariable(reference);
+                        this._value = getVariable(reference);
                     }
                     else {
                         throw new Error('Null reference and undefined value');
                     }
                 }
                 else {
-                    this.value = value;
+                    this._value = _value;
                 }
             }
         }
-    }
-    function simplify(_number, decimalPlaces) {
-        return parseFloat(_number.toFixed(decimalPlaces))
-            .toString();
+        get value() {
+            if (this.reference) {
+                if (this.reference in globalVariablesObject) {
+                    return parseFloat(globalVariablesObject[this.reference]);
+                }
+            }
+            return this._value;
+        }
+        set value(_value) {
+            if (this.reference) {
+                globalVariablesObject[this.reference] = simplify(_value, 4);
+            }
+            this._value = _value;
+        }
     }
     class LinkedExpression extends LinkedVariable {
         constructor(baseReference, _variables) {
@@ -285,14 +349,14 @@ for (let i = 0; i < expressionFormat.length; i++) {
     }
     function updateVariables(filter) {
         globalVariablesObject = {};
-        let currExpressions = Calc.getExpressions();
+        let currExpressions = MyCalc.getExpressions();
         if (filter) {
             const idFilter = `${filter}_`;
             currExpressions = currExpressions.filter((x) => x.id.startsWith(idFilter));
         }
         for (let i = 0; i < currExpressions.length; i++) {
             const expression = currExpressions[i];
-            const analysis = Calc.expressionAnalysis[expression.id];
+            const analysis = MyCalc.expressionAnalysis[expression.id];
             if (analysis) {
                 if (analysis.evaluation) {
                     if (analysis.evaluation.type === 'Number') {
@@ -302,43 +366,13 @@ for (let i = 0; i < expressionFormat.length; i++) {
                         }
                     }
                 }
-                else if (expression.latex.includes('f_')) {
-                    // console.log(expression);
+                else if (expression.latex) {
+                    if (expression.latex.includes('f_')) {
+                        // console.log(expression);
+                    }
                 }
             }
         }
-    }
-    function fallbackCopyTextToClipboard(text) {
-        const textArea = document.createElement('textarea');
-        textArea.value = text;
-        // Avoid scrolling to bottom
-        textArea.style.top = '0';
-        textArea.style.left = '0';
-        textArea.style.position = 'fixed';
-        document.body.appendChild(textArea);
-        textArea.focus();
-        textArea.select();
-        try {
-            const successful = document.execCommand('copy');
-            const msg = successful ? 'successful' : 'unsuccessful';
-            console.log(`Fallback: Copying text command was ${msg}`);
-        }
-        catch (err) {
-            console.error('Fallback: Oops, unable to copy', err);
-        }
-        document.body.removeChild(textArea);
-    }
-    function copyTextToClipboard(text) {
-        if (!navigator.clipboard) {
-            fallbackCopyTextToClipboard(text);
-            return;
-        }
-        navigator.clipboard.writeText(text)
-            .then(() => {
-            console.log('Async: Copying to clipboard was successful!');
-        }, (err) => {
-            console.error('Async: Could not copy text: ', err);
-        });
     }
     function intersect(array1, array2) {
         return array1.filter((value) => array2.includes(value));
@@ -402,7 +436,12 @@ for (let i = 0; i < expressionFormat.length; i++) {
         return !(cropType % 2);
     }
     function getDomains(currId) {
-        return { xMin: new LinkedVariable(`x_{${currId}ca}`), yMin: new LinkedVariable(`y_{${currId}ca}`), xMax: new LinkedVariable(`x_{${currId}cb}`), yMax: new LinkedVariable(`y_{${currId}cb}`) };
+        return {
+            xMin: new LinkedVariable(`x_{${currId}ca}`),
+            yMin: new LinkedVariable(`y_{${currId}ca}`),
+            xMax: new LinkedVariable(`x_{${currId}cb}`),
+            yMax: new LinkedVariable(`y_{${currId}cb}`),
+        };
     }
     function parseDomains(domains) {
         let [xMin, yMin, xMax, yMax] = [-Infinity, -Infinity, Infinity, Infinity];
@@ -447,10 +486,28 @@ for (let i = 0; i < expressionFormat.length; i++) {
         }
         return { xMin, xMax, yMin, yMax };
     }
+    function evaluateExpression() {
+    }
+    function evaluateFunction(_function, variables) {
+        //
+    }
+    function findById() {
+    }
+    function minMax(variables) {
+        return {
+            min: minLinkedVariable(variables),
+            max: maxLinkedVariable(variables),
+        };
+    }
     function substitute(_latex) {
         let latex = _latex;
-        const variablesNeeded = [...latex.matchAll(/[a-z]+_{[\w\d]+}/g)];
+        const variablesNeeded = [...latex.matchAll(/[a-z]+_{[\w\d]+}(?:\((.*)\))?/g)];
         for (let j = 0; j < variablesNeeded.length; j++) {
+            if (variablesNeeded[j].length === 3) { // function
+                const functionName = variablesNeeded[j][1];
+                const variables = variablesNeeded[j][2].split(',');
+                console.log(functionName, variables);
+            }
             const variableNeeded = variablesNeeded[j][0];
             latex = latex.replace(variableNeeded, simplify(getVariable(variableNeeded), 4));
         }
@@ -491,6 +548,95 @@ for (let i = 0; i < expressionFormat.length; i++) {
             this.conicId = parseInt(this.id.split('_')[0], 10);
             this.conicType = this.getConicType();
         }
+        // return `${A}x^{2}+${C}y^{2}+${D}x+${E}y+${F}=0`;
+        getGeneralForm() {
+            let A = 0;
+            let C = 0;
+            let D = 0;
+            let E = 0;
+            let F = 0;
+            if (this.conicType === 0) { // Circle
+                const h = getVariable(`h_{${this.conicId}}`);
+                const k = getVariable(`k_{${this.conicId}}`);
+                const r = getVariable(`r_{${this.conicId}}`);
+                A = 1;
+                C = 1;
+                D = -2 * h;
+                E = -2 * k;
+                F = k ** 2 + h ** 2 - r ** 2;
+            }
+            else if (this.conicType === 1) { // Horizontal Parabola
+                const h = getVariable(`h_{${this.conicId}}`);
+                const k = getVariable(`k_{${this.conicId}}`);
+                const c = getVariable(`c_{${this.conicId}}`);
+                A = 0;
+                C = 1;
+                D = -4 * c;
+                E = -2 * k;
+                F = 4 * c * h + k ** 2;
+            }
+            else if (this.conicType === 2) { // Vertical Parabola
+                const h = getVariable(`h_{${this.conicId}}`);
+                const k = getVariable(`k_{${this.conicId}}`);
+                const c = getVariable(`c_{${this.conicId}}`);
+                A = 1;
+                C = 0;
+                D = -2 * h;
+                E = -4 * c;
+                F = 4 * c * k + h ** 2;
+            }
+            else if (this.conicType === 3) { // Circle
+                const h = getVariable(`h_{${this.conicId}}`);
+                const k = getVariable(`k_{${this.conicId}}`);
+                const a = getVariable(`a_{${this.conicId}}`);
+                const b = getVariable(`b_{${this.conicId}}`);
+                A = b ** 2;
+                C = a ** 2;
+                D = -2 * h * b ** 2;
+                E = -2 * k * a ** 2;
+                F = b ** 2 * h ** 2 + a ** 2 * k ** 2 - a ** 2 * b ** 2;
+            }
+            else if (this.conicType === 4) { // Circle
+                const h = getVariable(`h_{${this.conicId}}`);
+                const k = getVariable(`k_{${this.conicId}}`);
+                const a = getVariable(`a_{${this.conicId}}`);
+                const b = getVariable(`b_{${this.conicId}}`);
+                A = b ** 2;
+                C = -(a ** 2);
+                D = -2 * h * b ** 2;
+                E = 2 * k * a ** 2;
+                F = b ** 2 * h ** 2 - a ** 2 * k ** 2 - a ** 2 * b ** 2;
+            }
+            else if (this.conicType === 5) { // Circle
+                const h = getVariable(`h_{${this.conicId}}`);
+                const k = getVariable(`k_{${this.conicId}}`);
+                const a = getVariable(`a_{${this.conicId}}`);
+                const b = getVariable(`b_{${this.conicId}}`);
+                // (y - k)^2 * a^2 - (x - h)^2 * b^2 = a^2 * b^2
+                // a^2(y^2 - 2ky + k^2) - b^2(x^2 - 2hx + h^2) = a^2 * b^2
+                A = -(b ** 2);
+                C = a ** 2;
+                D = 2 * h * b ** 2;
+                E = -2 * k * a ** 2;
+                F = a ** 2 * k ** 2 - b ** 2 * h ** 2 - a ** 2 * b ** 2;
+            }
+            else if (this.conicType === 6) { // Circle
+                const m = getVariable(`m_{${this.conicId}}`);
+                const b = getVariable(`b_{${this.conicId}}`);
+                A = 0;
+                C = 0;
+                D = m;
+                E = 0;
+                F = b;
+            }
+            return {
+                A: parseFloat(simplify(A, 4)),
+                C: parseFloat(simplify(C, 4)),
+                D: parseFloat(simplify(D, 4)),
+                E: parseFloat(simplify(E, 4)),
+                F: parseFloat(simplify(F, 4)),
+            };
+        }
         toExpression() {
             return {
                 id: this.id,
@@ -518,72 +664,17 @@ for (let i = 0; i < expressionFormat.length; i++) {
             }
         }
         getBounds() {
-            const { conicType } = this;
-            const { conicId } = this;
-            let { xMin, yMin, xMax, yMax } = getDomains(conicId);
-            let [newXMin, newXMax, newYMin, newYMax] = [-Infinity, -Infinity, Infinity, Infinity];
+            let { xMin, yMin, xMax, yMax } = this.getRealBounds();
             const cropType = this.getCropType();
-            if (conicType === 0) {
-                const h = getVariable(`h_{${conicId}}`);
-                const k = getVariable(`k_{${conicId}}`);
-                const r = getVariable(`r_{${conicId}}`);
-                newXMin = h - r;
-                newXMax = h + r;
-                newYMin = k - r;
-                newYMax = k + r;
-            }
-            else if (conicType === 1) {
-                const c = getVariable(`c_{${conicId}}`);
-                const h = getVariable(`h_{${conicId}}`);
-                newXMin = (c > 0) ? h : -Infinity;
-                newXMax = (c < 0) ? h : Infinity;
-                newYMin = -Infinity;
-                newYMax = Infinity;
-            }
-            else if (conicType === 2) {
-                const c = getVariable(`c_{${conicId}}`);
-                const k = getVariable(`k_{${conicId}}`);
-                newXMin = -Infinity;
-                newXMax = Infinity;
-                newYMin = (c > 0) ? k : -Infinity;
-                newYMax = (c < 0) ? k : Infinity;
-            }
-            else if (conicType === 3) {
-                const h = getVariable(`h_{${conicId}}`);
-                const k = getVariable(`k_{${conicId}}`);
-                const a = Math.abs(getVariable(`a_{${conicId}}`));
-                const b = Math.abs(getVariable(`b_{${conicId}}`));
-                newXMin = h - a;
-                newXMax = h + a;
-                newYMin = k - b;
-                newYMax = k + b;
-            }
-            else if (conicType === 6) {
-                const x1 = new LinkedVariable(`x_{${conicId}ca}`);
-                const x2 = new LinkedVariable(`x_{${conicId}cb}`);
-                const y1 = new LinkedVariable(`y_{${conicId}ca}`);
-                const y2 = new LinkedVariable(`y_{${conicId}cb}`);
-                xMin = x1.value < x2.value ? x1 : x2;
-                xMax = x1.value < x2.value ? x2 : x1;
-                yMin = y1.value < y2.value ? y1 : y2;
-                yMax = y1.value < y2.value ? y2 : y1;
-            }
-            newXMin = hasXDomain(cropType) ? newXMin : -Infinity;
-            newXMax = hasXDomain(cropType) ? newXMax : Infinity;
-            newYMin = hasYDomain(cropType) ? newYMin : -Infinity;
-            newYMax = hasYDomain(cropType) ? newYMax : Infinity;
-            if (xMin.value < newXMin) {
-                xMin = { reference: null, value: -Infinity };
-            }
-            if (yMin.value < newYMin) {
-                yMin = { reference: null, value: -Infinity };
-            }
-            if (xMax.value > newXMax) {
-                xMax = { reference: null, value: Infinity };
-            }
-            if (yMax.value > newYMax) {
-                yMax = { reference: null, value: Infinity };
-            }
+            const { xMin: xMinDomain, yMin: yMinDomain, xMax: xMaxDomain, yMax: yMaxDomain, } = getDomains(this.conicId);
+            xMin = xMinDomain.value < xMin.value ? new LinkedVariable(-Infinity) : xMinDomain;
+            xMax = xMaxDomain.value > xMax.value ? new LinkedVariable(Infinity) : xMaxDomain;
+            yMin = yMinDomain.value < yMin.value ? new LinkedVariable(-Infinity) : yMinDomain;
+            yMax = yMaxDomain.value > yMax.value ? new LinkedVariable(Infinity) : yMaxDomain;
+            xMin = hasXDomain(cropType) ? xMin : new LinkedVariable(-Infinity);
+            xMax = hasXDomain(cropType) ? xMax : new LinkedVariable(Infinity);
+            yMin = hasYDomain(cropType) ? yMin : new LinkedVariable(-Infinity);
+            yMax = hasYDomain(cropType) ? yMax : new LinkedVariable(Infinity);
             return { xMin, yMin, xMax, yMax };
         }
         getCropType() {
@@ -656,28 +747,16 @@ for (let i = 0; i < expressionFormat.length; i++) {
                 const h = getVariable(`h_{${conicId}}`);
                 const k = getVariable(`k_{${conicId}}`);
                 if (axis === 'x') {
-                    if (h < xMin.value) {
+                    if (h < xMax.value)
                         relevantIndices.push(1);
-                    }
-                    else if (h < xMax.value) {
+                    if (xMin.value < h)
                         relevantIndices.push(0);
-                        relevantIndices.push(1);
-                    }
-                    else if (xMax.value < h) {
-                        relevantIndices.push(0);
-                    }
                 }
                 if (axis === 'y') {
-                    if (k < yMin.value) {
+                    if (k < yMax.value)
                         relevantIndices.push(1);
-                    }
-                    else if (k < yMax.value) {
+                    if (yMin.value < k)
                         relevantIndices.push(0);
-                        relevantIndices.push(1);
-                    }
-                    else if (yMax.value < k) {
-                        relevantIndices.push(0);
-                    }
                 }
             }
             else if (conicType === 1) {
@@ -686,31 +765,19 @@ for (let i = 0; i < expressionFormat.length; i++) {
                     relevantIndices.push(0);
                 }
                 if (axis === 'y') {
-                    if (k < yMin.value) {
+                    if (k < yMax.value)
                         relevantIndices.push(1);
-                    }
-                    else if (k < yMax.value) {
+                    if (yMin.value < k)
                         relevantIndices.push(0);
-                        relevantIndices.push(1);
-                    }
-                    else if (yMax.value < k) {
-                        relevantIndices.push(0);
-                    }
                 }
             }
             else if (conicType === 2) {
                 const h = getVariable(`h_{${conicId}}`);
                 if (axis === 'x') {
-                    if (h < xMin.value) {
+                    if (h < xMax.value)
                         relevantIndices.push(1);
-                    }
-                    else if (h < xMax.value) {
+                    if (xMin.value < h)
                         relevantIndices.push(0);
-                        relevantIndices.push(1);
-                    }
-                    else if (xMax.value < h) {
-                        relevantIndices.push(0);
-                    }
                 }
                 if (axis === 'y') {
                     relevantIndices.push(0);
@@ -720,28 +787,16 @@ for (let i = 0; i < expressionFormat.length; i++) {
                 const h = getVariable(`h_{${conicId}}`);
                 const k = getVariable(`k_{${conicId}}`);
                 if (axis === 'x') {
-                    if (h < xMin.value) {
+                    if (h < xMax.value)
                         relevantIndices.push(1);
-                    }
-                    else if (h < xMax.value) {
+                    if (xMin.value < h)
                         relevantIndices.push(0);
-                        relevantIndices.push(1);
-                    }
-                    else if (xMax.value < h) {
-                        relevantIndices.push(0);
-                    }
                 }
                 if (axis === 'y') {
-                    if (k < yMin.value) {
+                    if (k < yMax.value)
                         relevantIndices.push(1);
-                    }
-                    else if (k < yMax.value) {
+                    if (yMin.value < k)
                         relevantIndices.push(0);
-                        relevantIndices.push(1);
-                    }
-                    else if (yMax.value < k) {
-                        relevantIndices.push(0);
-                    }
                 }
             }
             else if (conicType === 4) {
@@ -750,20 +805,16 @@ for (let i = 0; i < expressionFormat.length; i++) {
                 const a = getVariable(`a_{${conicId}}`);
                 const b = getVariable(`b_{${conicId}}`);
                 if (axis === 'x') {
-                    if (xMax.value < h + a) {
+                    if (xMax.value < h + a)
                         relevantIndices.push(0);
-                    }
-                    if (xMin.value > h - a) {
+                    if (xMin.value > h - a)
                         relevantIndices.push(1);
-                    }
                 }
                 if (axis === 'y') {
-                    if (yMax.value < k) {
+                    if (yMax.value < k)
                         relevantIndices.push(0);
-                    }
-                    if (yMin.value > k) {
+                    if (yMin.value > k)
                         relevantIndices.push(1);
-                    }
                 }
             }
             else if (conicType === 5) {
@@ -772,20 +823,16 @@ for (let i = 0; i < expressionFormat.length; i++) {
                 const a = getVariable(`a_{${conicId}}`);
                 const b = getVariable(`b_{${conicId}}`);
                 if (axis === 'x') {
-                    if (yMax.value < h) {
+                    if (yMax.value < h)
                         relevantIndices.push(0);
-                    }
-                    if (yMin.value > h) {
+                    if (yMin.value > h)
                         relevantIndices.push(1);
-                    }
                 }
                 if (axis === 'y') {
-                    if (yMax.value < k + a) {
+                    if (yMax.value < k + a)
                         relevantIndices.push(0);
-                    }
-                    if (yMin.value > k - a) {
+                    if (yMin.value > k - a)
                         relevantIndices.push(1);
-                    }
                 }
             }
             else if (conicType === 6) {
@@ -833,10 +880,10 @@ for (let i = 0; i < expressionFormat.length; i++) {
             let x2 = xMax;
             let y1 = yMin;
             let y2 = yMax;
-            let xa = { min: new LinkedVariable(null, -Infinity), max: new LinkedVariable(null, Infinity) };
-            let xb = { min: new LinkedVariable(null, -Infinity), max: new LinkedVariable(null, Infinity) };
-            let ya = { min: new LinkedVariable(null, -Infinity), max: new LinkedVariable(null, Infinity) };
-            let yb = { min: new LinkedVariable(null, -Infinity), max: new LinkedVariable(null, Infinity) };
+            let xa = { min: new LinkedVariable(-Infinity), max: new LinkedVariable(Infinity) };
+            let xb = { min: new LinkedVariable(-Infinity), max: new LinkedVariable(Infinity) };
+            let ya = { min: new LinkedVariable(-Infinity), max: new LinkedVariable(Infinity) };
+            let yb = { min: new LinkedVariable(-Infinity), max: new LinkedVariable(Infinity) };
             let points = [];
             if (conicType === 0) {
                 const h = new LinkedVariable(`h_{${conicId}}`);
@@ -926,10 +973,10 @@ for (let i = 0; i < expressionFormat.length; i++) {
                 x2 = new LinkedVariable(`x_{${conicId}cb}`);
                 y1 = new LinkedVariable(`y_{${conicId}ca}`);
                 y2 = new LinkedVariable(`y_{${conicId}cb}`);
-                newXMin = minLinkedVariable([x1, x2]);
-                newXMax = maxLinkedVariable([x1, x2]);
-                newYMin = minLinkedVariable([y1, y2]);
-                newYMax = maxLinkedVariable([y1, y2]);
+                xa = minMax([x1, x2]);
+                xb = minMax([x1, x2]);
+                ya = minMax([y1, y2]);
+                yb = minMax([y1, y2]);
             }
             let additionalPoints = [
                 { x: xMin, y: ya.min },
@@ -1008,21 +1055,18 @@ for (let i = 0; i < expressionFormat.length; i++) {
             h = -h;
             k = -k;
             r = Math.sqrt(Math.abs(r));
-            return [h, k, r];
         }
         if (conicType === 1) {
             [k, c, h] = variables;
             h = -h;
             k = -k;
             c /= 4;
-            return [k, c, h];
         }
         if (conicType === 2) {
             [h, c, k] = variables;
             h = -h;
             k = -k;
             c /= 4;
-            return [h, c, k];
         }
         if (conicType === 3) {
             [h, a, k, b] = variables;
@@ -1030,7 +1074,6 @@ for (let i = 0; i < expressionFormat.length; i++) {
             k = -k;
             a = Math.sqrt(Math.abs(a));
             b = Math.sqrt(Math.abs(b));
-            return [h, a, k, b];
         }
         if (conicType === 4) {
             [h, a, k, b] = variables;
@@ -1038,7 +1081,6 @@ for (let i = 0; i < expressionFormat.length; i++) {
             k = -k;
             a = Math.sqrt(Math.abs(a));
             b = Math.sqrt(Math.abs(b));
-            return [h, a, k, b];
         }
         if (conicType === 5) {
             [k, a, h, b] = variables;
@@ -1046,104 +1088,109 @@ for (let i = 0; i < expressionFormat.length; i++) {
             k = -k;
             a = Math.sqrt(Math.abs(a));
             b = Math.sqrt(Math.abs(b));
-            return [k, a, h, b];
         }
         if (conicType === 6) {
             [m, b, x1, x2] = variables;
-            return [m, b, x1, x2];
         }
-        return {};
+        return { k, c, h, r, a, b, m, x1, x2 };
+    }
+    function toId(expression, _id) {
+        return expression.replace(/_\{\d+([a-z]*)}/g, `_{${_id}$1}`);
     }
     function createWithBounds(conicId, conicType, variables, _bounds) {
         let { xMin, yMin, xMax, yMax } = _bounds;
         const expression = expressionFormat[conicType];
         const expressionsToSet = [];
+        let k = 0;
+        let c = 0;
+        let h = 0;
+        let r = 0;
+        let a = 0;
+        let b = 0;
+        let m = 0;
+        let x1 = 0;
+        let x2 = 0;
+        if (conicType === 0) {
+            ({ h, k, r } = variables);
+            setVariable(`h_{${conicId}}`, simplify(h, 4));
+            setVariable(`k_{${conicId}}`, simplify(k, 4));
+            setVariable(`a_{${conicId}}`, simplify(r, 4));
+            setVariable(`b_{${conicId}}`, '0');
+            setVariable(`r_{${conicId}}`, simplify(r, 4));
+        }
+        else if (conicType === 1) {
+            ({ k, c, h } = variables);
+            const d = Math.sign(c) / 4;
+            const e = Math.sqrt(Math.abs(c));
+            setVariable(`h_{${conicId}}`, simplify(h, 4));
+            setVariable(`k_{${conicId}}`, simplify(k, 4));
+            setVariable(`d_{${conicId}}`, simplify(d, 4));
+            setVariable(`e_{${conicId}}`, simplify(e, 4));
+            setVariable(`c_{${conicId}}`, simplify(c, 4));
+        }
+        else if (conicType === 2) {
+            ({ h, c, k } = variables);
+            const d = Math.sign(c) / 4;
+            const e = Math.sqrt(Math.abs(c));
+            setVariable(`h_{${conicId}}`, simplify(h, 4));
+            setVariable(`k_{${conicId}}`, simplify(k, 4));
+            setVariable(`d_{${conicId}}`, simplify(d, 4));
+            setVariable(`e_{${conicId}}`, simplify(e, 4));
+            globalVariablesObject[`c_{${conicId}}`] = simplify(c, 4);
+        }
+        else if (conicType === 3) {
+            ({ h, a, k, b } = variables);
+            setVariable(`h_{${conicId}}`, simplify(h, 4));
+            setVariable(`k_{${conicId}}`, simplify(k, 4));
+            setVariable(`a_{${conicId}}`, simplify(a, 4));
+            setVariable(`b_{${conicId}}`, simplify(b, 4));
+        }
+        else if (conicType === 4) {
+            ({ h, a, k, b } = variables);
+            setVariable(`h_{${conicId}}`, simplify(h, 4));
+            setVariable(`k_{${conicId}}`, simplify(k, 4));
+            setVariable(`a_{${conicId}}`, simplify(a, 4));
+            setVariable(`b_{${conicId}}`, simplify(b, 4));
+        }
+        else if (conicType === 5) {
+            ({ k, a, h, b } = variables);
+            setVariable(`h_{${conicId}}`, simplify(h, 4));
+            setVariable(`k_{${conicId}}`, simplify(k, 4));
+            setVariable(`a_{${conicId}}`, simplify(a, 4));
+            setVariable(`b_{${conicId}}`, simplify(b, 4));
+        }
+        else if (conicType === 6) {
+            ({ m, b, x1, x2 } = variables);
+            const y1 = m * x1 + b;
+            const y2 = m * x2 + b;
+            setVariable(`x_{${conicId}a}`, simplify(x1, 4));
+            setVariable(`y_{${conicId}a}`, simplify(y1, 4));
+            setVariable(`x_{${conicId}b}`, simplify(x2, 4));
+            setVariable(`y_{${conicId}b}`, simplify(y2, 4));
+        }
+        if (conicType !== 6) {
+            setVariable(`x_{${conicId}cam}`, simplify(xMin - h, 4));
+            setVariable(`y_{${conicId}cam}`, simplify(yMin - k, 4));
+            setVariable(`x_{${conicId}cbm}`, simplify(xMax - h, 4));
+            setVariable(`y_{${conicId}cbm}`, simplify(yMax - k, 4));
+            setVariable(`x_{${conicId}ca}`, simplify(xMin, 4));
+            setVariable(`y_{${conicId}ca}`, simplify(yMin, 4));
+            setVariable(`x_{${conicId}cb}`, simplify(xMax, 4));
+            setVariable(`y_{${conicId}cb}`, simplify(yMax, 4));
+        }
         for (let i = 0; i < expression.length; i++) {
-            let newExpressionLatex = expression[i].latex;
+            const newExpression = expression[i];
+            let newExpressionLatex = newExpression.latex;
             newExpressionLatex = newExpressionLatex.replaceAll('_{1', `_{${conicId}`);
-            if (i === 0) {
-                if (conicType !== 6) {
-                    newExpressionLatex += generateBounds(new LinkedVariable(`x_{${conicId}ca}`, xMin), new LinkedVariable(`y_{${conicId}ca}`, yMin), new LinkedVariable(`x_{${conicId}cb}`, xMax), new LinkedVariable(`y_{${conicId}cb}`, yMax))
-                        .reference;
-                }
-            }
-            let k = 0;
-            let c = 0;
-            let h = 0;
-            let r = 0;
-            let a = 0;
-            let b = 0;
-            let m = 0;
-            let x1 = 0;
-            let x2 = 0;
-            if (conicType === 0) {
-                [h, k, r] = variables;
-                newExpressionLatex = trySetVariable(newExpressionLatex, 'h_{1}', conicId, simplify(h, 4));
-                newExpressionLatex = trySetVariable(newExpressionLatex, 'k_{1}', conicId, simplify(k, 4));
-                newExpressionLatex = trySetVariable(newExpressionLatex, 'a_{1}', conicId, simplify(r, 4));
-                newExpressionLatex = trySetVariable(newExpressionLatex, 'b_{1}', conicId, '0');
-                globalVariablesObject[`r_{${conicId}}`] = simplify(r, 4);
-            }
-            else if (conicType === 1) {
-                [k, c, h] = variables;
-                const d = Math.sign(c) / 4;
-                const e = Math.sqrt(Math.abs(c));
-                newExpressionLatex = trySetVariable(newExpressionLatex, 'h_{1}', conicId, simplify(h, 4));
-                newExpressionLatex = trySetVariable(newExpressionLatex, 'k_{1}', conicId, simplify(k, 4));
-                newExpressionLatex = trySetVariable(newExpressionLatex, 'd_{1}', conicId, simplify(d, 4));
-                newExpressionLatex = trySetVariable(newExpressionLatex, 'e_{1}', conicId, simplify(e, 4));
-                globalVariablesObject[`c_{${conicId}}`] = simplify(c, 4);
-            }
-            else if (conicType === 2) {
-                [h, c, k] = variables;
-                const d = Math.sign(c) / 4;
-                const e = Math.sqrt(Math.abs(c));
-                newExpressionLatex = trySetVariable(newExpressionLatex, 'h_{1}', conicId, simplify(h, 4));
-                newExpressionLatex = trySetVariable(newExpressionLatex, 'k_{1}', conicId, simplify(k, 4));
-                newExpressionLatex = trySetVariable(newExpressionLatex, 'd_{1}', conicId, simplify(d, 4));
-                newExpressionLatex = trySetVariable(newExpressionLatex, 'e_{1}', conicId, simplify(e, 4));
-                globalVariablesObject[`c_{${conicId}}`] = simplify(c, 4);
-            }
-            else if (conicType === 3) {
-                [h, a, k, b] = variables;
-                newExpressionLatex = trySetVariable(newExpressionLatex, 'h_{1}', conicId, simplify(h, 4));
-                newExpressionLatex = trySetVariable(newExpressionLatex, 'k_{1}', conicId, simplify(k, 4));
-                newExpressionLatex = trySetVariable(newExpressionLatex, 'a_{1}', conicId, simplify(a, 4));
-                newExpressionLatex = trySetVariable(newExpressionLatex, 'b_{1}', conicId, simplify(b, 4));
-            }
-            else if (conicType === 4) {
-                [h, a, k, b] = variables;
-                newExpressionLatex = trySetVariable(newExpressionLatex, 'h_{1}', conicId, simplify(h, 4));
-                newExpressionLatex = trySetVariable(newExpressionLatex, 'k_{1}', conicId, simplify(k, 4));
-                newExpressionLatex = trySetVariable(newExpressionLatex, 'a_{1}', conicId, simplify(a, 4));
-                newExpressionLatex = trySetVariable(newExpressionLatex, 'b_{1}', conicId, simplify(b, 4));
-            }
-            else if (conicType === 5) {
-                [k, a, h, b] = variables;
-                newExpressionLatex = trySetVariable(newExpressionLatex, 'h_{1}', conicId, simplify(h, 4));
-                newExpressionLatex = trySetVariable(newExpressionLatex, 'k_{1}', conicId, simplify(k, 4));
-                newExpressionLatex = trySetVariable(newExpressionLatex, 'a_{1}', conicId, simplify(a, 4));
-                newExpressionLatex = trySetVariable(newExpressionLatex, 'b_{1}', conicId, simplify(b, 4));
-            }
-            else if (conicType === 6) {
-                [m, b, x1, x2] = variables;
-                const y1 = m * x1 + b;
-                const y2 = m * x2 + b;
-                newExpressionLatex = trySetVariable(newExpressionLatex, 'x_{1a}', conicId, simplify(x1, 4));
-                newExpressionLatex = trySetVariable(newExpressionLatex, 'y_{1a}', conicId, simplify(y1, 4));
-                newExpressionLatex = trySetVariable(newExpressionLatex, 'x_{1b}', conicId, simplify(x2, 4));
-                newExpressionLatex = trySetVariable(newExpressionLatex, 'y_{1b}', conicId, simplify(y2, 4));
+            if (doesIntersect(newExpression.types, ['var'])) {
+                const [variable] = newExpressionLatex.split('=');
+                const value = globalVariablesObject[toId(variable, id)];
+                newExpressionLatex = `${variable}=${value}`;
             }
             if (conicType !== 6) {
-                newExpressionLatex = trySetVariable(newExpressionLatex, 'x_{1cam}', conicId, simplify(xMin - h, 4));
-                newExpressionLatex = trySetVariable(newExpressionLatex, 'y_{1cam}', conicId, simplify(yMin - k, 4));
-                newExpressionLatex = trySetVariable(newExpressionLatex, 'x_{1cbm}', conicId, simplify(xMax - h, 4));
-                newExpressionLatex = trySetVariable(newExpressionLatex, 'y_{1cbm}', conicId, simplify(yMax - k, 4));
-                globalVariablesObject[`x_{${conicId}ca}`] = simplify(xMin, 4);
-                globalVariablesObject[`y_{${conicId}ca}`] = simplify(yMin, 4);
-                globalVariablesObject[`x_{${conicId}cb}`] = simplify(xMax, 4);
-                globalVariablesObject[`y_{${conicId}cb}`] = simplify(yMax, 4);
                 if (i === 0) {
+                    newExpressionLatex += generateBounds(new LinkedVariable(`x_{${conicId}ca}`, xMin), new LinkedVariable(`y_{${conicId}ca}`, yMin), new LinkedVariable(`x_{${conicId}cb}`, xMax), new LinkedVariable(`y_{${conicId}cb}`, yMax))
+                        .reference;
                     const conic = new Conic({ id: `${conicId.toString()}_${i}`, latex: newExpressionLatex, color: 'BLACK', hidden: doesIntersect(expression[i].types, ['x_expression', 'y_expression']), type: 'expression' });
                     console.log(globalVariablesObject);
                     const bounds = conic.getRealBounds();
@@ -1160,11 +1207,19 @@ for (let i = 0; i < expressionFormat.length; i++) {
                     if (!Number.isFinite(yMax)) {
                         yMax = bounds.yMax.value + 2;
                     }
+                    setVariable(`x_{${conicId}cam}`, simplify(xMin - h, 4));
+                    setVariable(`y_{${conicId}cam}`, simplify(yMin - k, 4));
+                    setVariable(`x_{${conicId}cbm}`, simplify(xMax - h, 4));
+                    setVariable(`y_{${conicId}cbm}`, simplify(yMax - k, 4));
+                    setVariable(`x_{${conicId}ca}`, simplify(xMin, 4));
+                    setVariable(`y_{${conicId}ca}`, simplify(yMin, 4));
+                    setVariable(`x_{${conicId}cb}`, simplify(xMax, 4));
+                    setVariable(`y_{${conicId}cb}`, simplify(yMax, 4));
                 }
             }
             expressionsToSet.push({ id: `${conicId.toString()}_${i}`, latex: newExpressionLatex, color: 'BLACK', hidden: doesIntersect(expression[i].types, ['x_expression', 'y_expression']), type: 'expression' });
         }
-        Calc.setExpressions(expressionsToSet);
+        MyCalc.setExpressions(expressionsToSet);
     }
     function convertFromStandard(latex, _id) {
         const conicId = parseInt(_id, 10);
@@ -1196,75 +1251,9 @@ for (let i = 0; i < expressionFormat.length; i++) {
             }
         }
     }
-    function createHorizontalHyperbola(_id, variables, bounds) {
-        const { h: _h, k: _k, a: _a, b: _b } = variables;
-        const h = _h;
-        const k = _k;
-        const a = Math.sqrt(Math.abs(_a));
-        const b = Math.sqrt(Math.abs(_b));
-        const { xMin, yMin, xMax, yMax } = bounds;
-        const expressionsToSet = [];
-        for (let i = 0; i < expressionFormat[4].length; i++) {
-            let newExpressionLatex = expressionFormat[4][i].latex;
-            newExpressionLatex = newExpressionLatex.replaceAll('_{1', `_{${_id}`);
-            newExpressionLatex = trySetVariable(newExpressionLatex, 'h_{1}', _id, simplify(h, 4));
-            newExpressionLatex = trySetVariable(newExpressionLatex, 'k_{1}', _id, simplify(k, 4));
-            newExpressionLatex = trySetVariable(newExpressionLatex, 'a_{1}', _id, simplify(a, 4));
-            newExpressionLatex = trySetVariable(newExpressionLatex, 'b_{1}', _id, simplify(b, 4));
-            newExpressionLatex = trySetVariable(newExpressionLatex, 'x_{1cam}', _id, simplify(xMin.value - h, 4));
-            newExpressionLatex = trySetVariable(newExpressionLatex, 'y_{1cam}', _id, simplify(yMin.value - k, 4));
-            newExpressionLatex = trySetVariable(newExpressionLatex, 'x_{1cbm}', _id, simplify(xMax.value - h, 4));
-            newExpressionLatex = trySetVariable(newExpressionLatex, 'y_{1cbm}', _id, simplify(yMax.value - k, 4));
-            globalVariablesObject[`x_{${_id}ca}`] = simplify(xMin.value, 4);
-            globalVariablesObject[`y_{${_id}ca}`] = simplify(yMin.value, 4);
-            globalVariablesObject[`x_{${_id}cb}`] = simplify(xMax.value, 4);
-            globalVariablesObject[`y_{${_id}cb}`] = simplify(yMax.value, 4);
-            if (i === 0) {
-                newExpressionLatex += generateBounds(new LinkedVariable(`x_{${_id}ca}`, xMin.value), new LinkedVariable(`y_{${_id}ca}`, yMin.value), new LinkedVariable(`x_{${_id}cb}`, xMax.value), new LinkedVariable(`y_{${_id}cb}`, yMax.value)).reference;
-                console.log(xMin, yMin, xMax, yMax);
-                const newBounds = new Conic({
-                    color: 'BLACK',
-                    hidden: false,
-                    id: `${_id}_0`,
-                    latex: newExpressionLatex,
-                    type: 'expression',
-                }).getRealBounds();
-                console.log('bounds', bounds, newBounds);
-                if (!Number.isFinite(xMin)) {
-                    xMin.value = newBounds.xMin.value;
-                }
-                if (!Number.isFinite(yMin)) {
-                    yMin.value = newBounds.yMin.value;
-                }
-                if (!Number.isFinite(xMax)) {
-                    xMax.value = newBounds.xMax.value;
-                }
-                if (!Number.isFinite(yMax)) {
-                    yMax.value = newBounds.yMax.value;
-                }
-            }
-            expressionsToSet.push({
-                id: `${_id.toString()}_${i}`,
-                latex: newExpressionLatex,
-                color: 'BLACK',
-                hidden: doesIntersect(expressionFormat[4][i].types, ['x_expression', 'y_expression']),
-                type: 'expression',
-            });
-        }
-        Calc.setExpressions(expressionsToSet);
-        id += 1;
-    }
-    function toBounds(xMin, yMin, xMax, yMax) {
-        return {
-            xMin: new LinkedVariable(null, xMin),
-            yMin: new LinkedVariable(null, yMin),
-            xMax: new LinkedVariable(null, xMax),
-            yMax: new LinkedVariable(null, yMax),
-        };
-    }
     function unfinalizeConvert(expressionId) {
         const regex = /y=([-+]?(?:\d+\.?\d*)?)\\sqrt\{([-+]?\d+\.?\d*)\+\\left\(x([-+]?\d+\.?\d*)\\right\)\^\{2\}\}([-+]?\d+\.?\d*)/g;
-        const expression = Calc.getExpressions().find((_expression) => _expression.id === expressionId);
+        const expression = MyCalc.getExpressions().find((_expression) => _expression.id === expressionId);
         if (expression) {
             const variables = [...expression.latex.matchAll(regex)][0].slice(1);
             if (variables.length) {
@@ -1275,40 +1264,27 @@ for (let i = 0; i < expressionFormat.length; i++) {
                 const k = parseFloat(_k);
                 const a2 = b * a ** 2;
                 const b2 = b;
+                const { xMin: _xMin, xMax: _xMax, yMin: _yMin, yMax: _yMax } = parseDomains(getDomainsFromLatex(expression.latex));
+                const xMin = Math.max(-Infinity, _xMin);
+                const xMax = Math.min(Infinity, _xMax);
                 if (a < 0) { // down
+                    const yMin = Math.max(-Infinity, _yMin);
+                    const yMax = Math.min(k, _yMax);
                     if (b < 0) { // horizontal hyperbola
-                        const { xMin: _xMin, xMax: _xMax, yMin: _yMin, yMax: _yMax } = parseDomains(getDomainsFromLatex(expression.latex));
-                        const xMin = Math.max(-Infinity, _xMin);
-                        const yMin = Math.max(-Infinity, _yMin);
-                        const xMax = Math.min(Infinity, _xMax);
-                        const yMax = Math.min(k, _yMax);
-                        createWithBounds(id, 4, [h, Math.sqrt(Math.abs(b2)), k, Math.sqrt(Math.abs(a2))], { xMin, xMax, yMin, yMax });
+                        createWithBounds(id, 4, { h, a: Math.sqrt(Math.abs(b2)), k, b: Math.sqrt(Math.abs(a2)) }, { xMin, xMax, yMin, yMax });
                     }
                     else if (b > 0) { // vertical hyperbola
-                        const { xMin: _xMin, xMax: _xMax, yMin: _yMin, yMax: _yMax } = parseDomains(getDomainsFromLatex(expression.latex));
-                        const xMin = Math.max(-Infinity, _xMin);
-                        const yMin = Math.max(-Infinity, _yMin);
-                        const xMax = Math.min(Infinity, _xMax);
-                        const yMax = Math.min(k, _yMax);
-                        createWithBounds(id, 5, [k, Math.sqrt(Math.abs(a2)), h, Math.sqrt(Math.abs(b2))], { xMin, xMax, yMin, yMax });
+                        createWithBounds(id, 5, { h, a: Math.sqrt(Math.abs(a2)), k, b: Math.sqrt(Math.abs(b2)) }, { xMin, xMax, yMin, yMax });
                     }
                 }
                 else if (a > 0) { // up
+                    const yMin = Math.max(k, _yMin);
+                    const yMax = Math.min(Infinity, _yMax);
                     if (b < 0) { // horizontal hyperbola
-                        const { xMin: _xMin, xMax: _xMax, yMin: _yMin, yMax: _yMax } = parseDomains(getDomainsFromLatex(expression.latex));
-                        const xMin = Math.max(-Infinity, _xMin);
-                        const yMin = Math.max(k, _yMin);
-                        const xMax = Math.min(Infinity, _xMax);
-                        const yMax = Math.min(Infinity, _yMax);
-                        createWithBounds(id, 4, [h, Math.sqrt(Math.abs(b2)), k, Math.sqrt(Math.abs(a2))], { xMin, xMax, yMin, yMax });
+                        createWithBounds(id, 4, { h, a: Math.sqrt(Math.abs(b2)), k, b: Math.sqrt(Math.abs(a2)) }, { xMin, xMax, yMin, yMax });
                     }
                     else if (b > 0) { // vertical parabola
-                        const { xMin: _xMin, xMax: _xMax, yMin: _yMin, yMax: _yMax } = parseDomains(getDomainsFromLatex(expression.latex));
-                        const xMin = Math.max(-Infinity, _xMin);
-                        const yMin = Math.max(k, _yMin);
-                        const xMax = Math.min(Infinity, _xMax);
-                        const yMax = Math.min(Infinity, _yMax);
-                        createWithBounds(id, 5, [k, Math.sqrt(Math.abs(a2)), h, Math.sqrt(Math.abs(b2))], { xMin, xMax, yMin, yMax });
+                        createWithBounds(id, 5, { h, a: Math.sqrt(Math.abs(a2)), k, b: Math.sqrt(Math.abs(b2)) }, { xMin, xMax, yMin, yMax });
                     }
                 }
             }
@@ -1316,24 +1292,24 @@ for (let i = 0; i < expressionFormat.length; i++) {
     }
     function unfinalize(expressionId) {
         const currId = expressionId.split('_')[1];
-        const filteredExpressions = Calc.getExpressions();
+        const filteredExpressions = MyCalc.getExpressions();
         const baseExpression = filteredExpressions
             .find((x) => x.id === expressionId);
         if (baseExpression) {
             convertFromStandard(baseExpression.latex, currId);
-            Calc.removeExpressions([baseExpression]);
+            MyCalc.removeExpressions([baseExpression]);
         }
     }
     function finalize(expressionId) {
         const currId = expressionId.split('_')[0];
-        const hasSameId = Calc.getExpressions().find((x) => x.id === `final_${currId}`);
+        const hasSameId = MyCalc.getExpressions().find((x) => x.id === `final_${currId}`);
         const idFilter = `${currId}_`;
-        let filteredExpressions = Calc.getExpressions();
+        let filteredExpressions = MyCalc.getExpressions();
         filteredExpressions = filteredExpressions.filter((x) => x.id.startsWith(idFilter));
-        const baseExpression = filteredExpressions.filter((x) => x.id.includes('_0'))[0];
+        const baseExpression = filteredExpressions.filter((x) => x.id.endsWith('_0'))[0];
         const conic = new Conic(baseExpression);
         const expressionList = [];
-        const allExpressions = Calc.getExpressions();
+        const allExpressions = MyCalc.getExpressions();
         for (let i = 0; i < allExpressions.length; i++) {
             const expression = allExpressions[i];
             if (expression.latex) {
@@ -1353,81 +1329,90 @@ for (let i = 0; i < expressionFormat.length; i++) {
             conic.id = `final_${conic.conicId}`;
         }
         expressionList.push(conic.toExpression());
-        Calc.setExpressions(expressionList);
-        Calc.removeExpressions(filteredExpressions);
+        MyCalc.setExpressions(expressionList);
+        MyCalc.removeExpressions(filteredExpressions);
     }
     function createConic(conicType) {
         const expression = expressionFormat[conicType];
         const expressionsToSet = [];
+        const coordinates = MyCalc.graphpaperBounds.mathCoordinates;
+        expressionPos = { x: parseFloat(((coordinates.left + coordinates.right) / 2).toFixed(4)), y: parseFloat(((coordinates.top + coordinates.bottom) / 2).toFixed(4)) };
+        const verticalSize = (coordinates.top - coordinates.bottom);
+        const horizontalSize = (coordinates.right - coordinates.left);
+        const size = Math.min(verticalSize, horizontalSize);
+        setVariable(`h_{${id}}`, expressionPos.x);
+        setVariable(`k_{${id}}`, expressionPos.y);
+        if (conicType === 0) {
+            setVariable(`a_{${id}}`, size * 0.3);
+            setVariable(`b_{${id}}`, 0);
+        }
+        else if (conicType === 1) {
+            setVariable(`e_{${id}}`, size * 0.3);
+            setVariable(`d_{${id}}`, size * 0.3);
+        }
+        else if (conicType === 2) {
+            setVariable(`e_{${id}}`, size * 0.3);
+            setVariable(`d_{${id}}`, size * 0.3);
+        }
+        else if (conicType === 3) {
+            setVariable(`a_{${id}}`, size * 0.3);
+            setVariable(`b_{${id}}`, size * 0.2);
+        }
+        else if (conicType === 4) {
+            setVariable(`a_{${id}}`, size * 0.2);
+            setVariable(`b_{${id}}`, size * 0.2);
+        }
+        else if (conicType === 5) {
+            setVariable(`a_{${id}}`, size * 0.2);
+            setVariable(`b_{${id}}`, size * 0.2);
+        }
+        else if (conicType === 6) {
+            setVariable(`x_{${id}a}`, expressionPos.x - size * 0.2);
+            setVariable(`y_{${id}a}`, expressionPos.y - size * 0.2);
+            setVariable(`x_{${id}b}`, expressionPos.x + size * 0.2);
+            setVariable(`y_{${id}b}`, expressionPos.y + size * 0.2);
+        }
+        if (conicType !== 6) {
+            setVariable(`x_{${id}cam}`, -size * 0.4);
+            setVariable(`y_{${id}cam}`, -size * 0.4);
+            setVariable(`x_{${id}cbm}`, size * 0.4);
+            setVariable(`y_{${id}cbm}`, size * 0.4);
+        }
         for (let i = 0; i < expression.length; i++) {
-            let newExpressionLatex = expression[i].latex;
+            const newExpression = expression[i];
+            let newExpressionLatex = newExpression.latex;
             if (i === 0) {
                 if (conicType !== 6) {
                     newExpressionLatex += '\\left\\{x_{1ca}<x<x_{1cb}\\right\\}\\left\\{y_{1ca}<y<y_{1cb}\\right\\}';
                 }
             }
-            newExpressionLatex = newExpressionLatex.replaceAll('_{1', `_{${id}`);
-            const coordinates = Calc.graphpaperBounds.mathCoordinates;
-            expressionPos = { x: parseFloat(((coordinates.left + coordinates.right) / 2).toFixed(4)), y: parseFloat(((coordinates.top + coordinates.bottom) / 2).toFixed(4)) };
-            const verticalSize = (coordinates.top - coordinates.bottom);
-            const horizontalSize = (coordinates.right - coordinates.left);
-            const size = Math.min(verticalSize, horizontalSize);
-            newExpressionLatex = trySetVariable(newExpressionLatex, 'h_{1}', id, expressionPos.x);
-            newExpressionLatex = trySetVariable(newExpressionLatex, 'k_{1}', id, expressionPos.y);
-            if (conicType === 0) {
-                newExpressionLatex = trySetVariable(newExpressionLatex, 'a_{1}', id, size * 0.3);
-                newExpressionLatex = trySetVariable(newExpressionLatex, 'b_{1}', id, 0);
+            newExpressionLatex = newExpressionLatex.replace(/_\{\d+([a-z]*)}/g, `_{${id}$1}`);
+            if (doesIntersect(newExpression.types, ['var'])) {
+                const [variable] = newExpressionLatex.split('=');
+                const value = globalVariablesObject[toId(variable, id)];
+                newExpressionLatex = `${variable}=${value}`;
             }
-            else if (conicType === 1) {
-                newExpressionLatex = trySetVariable(newExpressionLatex, 'e_{1}', id, size * 0.3);
-                newExpressionLatex = trySetVariable(newExpressionLatex, 'd_{1}', id, size * 0.3);
-            }
-            else if (conicType === 2) {
-                newExpressionLatex = trySetVariable(newExpressionLatex, 'e_{1}', id, size * 0.3);
-                newExpressionLatex = trySetVariable(newExpressionLatex, 'd_{1}', id, size * 0.3);
-            }
-            else if (conicType === 3) {
-                newExpressionLatex = trySetVariable(newExpressionLatex, 'a_{1}', id, size * 0.3);
-                newExpressionLatex = trySetVariable(newExpressionLatex, 'b_{1}', id, size * 0.2);
-            }
-            else if (conicType === 4) {
-                newExpressionLatex = trySetVariable(newExpressionLatex, 'a_{1}', id, size * 0.2);
-                newExpressionLatex = trySetVariable(newExpressionLatex, 'b_{1}', id, size * 0.2);
-            }
-            else if (conicType === 5) {
-                newExpressionLatex = trySetVariable(newExpressionLatex, 'a_{1}', id, size * 0.2);
-                newExpressionLatex = trySetVariable(newExpressionLatex, 'b_{1}', id, size * 0.2);
-            }
-            else if (conicType === 6) {
-                newExpressionLatex = trySetVariable(newExpressionLatex, 'x_{1a}', id, expressionPos.x - size * 0.2);
-                newExpressionLatex = trySetVariable(newExpressionLatex, 'y_{1a}', id, expressionPos.y - size * 0.2);
-                newExpressionLatex = trySetVariable(newExpressionLatex, 'x_{1b}', id, expressionPos.x + size * 0.2);
-                newExpressionLatex = trySetVariable(newExpressionLatex, 'y_{1b}', id, expressionPos.y + size * 0.2);
-            }
-            newExpressionLatex = trySetVariable(newExpressionLatex, 'x_{1cam}', id, -size * 0.4);
-            newExpressionLatex = trySetVariable(newExpressionLatex, 'y_{1cam}', id, -size * 0.4);
-            newExpressionLatex = trySetVariable(newExpressionLatex, 'x_{1cbm}', id, size * 0.4);
-            newExpressionLatex = trySetVariable(newExpressionLatex, 'y_{1cbm}', id, size * 0.4);
+            const hidden = doesIntersect(expression[i].types, ['x_expression', 'y_expression']);
             expressionsToSet.push({ id: `${id.toString()}_${i}`,
                 latex: newExpressionLatex,
                 color: 'BLACK',
-                hidden: doesIntersect(expression[i].types, ['x_expression', 'y_expression']),
+                hidden,
                 type: 'expression' });
         }
         id += 1;
-        Calc.setExpressions(expressionsToSet);
+        MyCalc.setExpressions(expressionsToSet);
     }
     function freeze(force) {
         let newId = 0;
-        const expressions = Calc.getExpressions();
+        const expressions = MyCalc.getExpressions();
         if (expressions.length !== 1) {
             let conicExpressionsNormal = [];
             if (force) {
                 conicExpressionsNormal = expressions.filter((x) => !x.id.includes('_'));
             }
-            const conicExpressionsBase = expressions.filter((x) => x.id.includes('_0') && !x.id.includes('final_'));
-            const conicExpressionsFinal = expressions.filter((x) => x.id.includes('final_') && !x.id.includes('folder'));
-            const conicExpressionsShade = expressions.filter((x) => x.id.includes('shade_') && !x.id.includes('folder'));
+            const conicExpressionsBase = expressions.filter((x) => x.id.endsWith('_0') && !x.id.startsWith('final_'));
+            const conicExpressionsFinal = expressions.filter((x) => x.id.startsWith('final_') && !x.id.includes('folder'));
+            const conicExpressionsShade = expressions.filter((x) => x.id.startsWith('shade_') && !x.id.includes('folder'));
             const conicExpressionsNormalLatex = conicExpressionsNormal.map((_conicExpression) => {
                 const conicExpression = _conicExpression;
                 conicExpression.id = `final_${newId}`;
@@ -1465,16 +1450,16 @@ for (let i = 0; i < expressionFormat.length; i++) {
         else {
             const newExpressions = localStorage.getItem('expressions');
             if (newExpressions) {
-                Calc.setExpressions(JSON.parse(newExpressions));
+                MyCalc.setExpressions(JSON.parse(newExpressions));
             }
         }
     }
     function resetSelection() {
-        shadingData.lastUpperBoundary = { x: { reference: null, value: -Infinity }, y: { reference: null, value: -Infinity } };
-        shadingData.lastLowerBoundary = { x: { reference: null, value: -Infinity }, y: { reference: null, value: -Infinity } };
+        shadingData.lastUpperBoundary = { x: new LinkedVariable(-Infinity), y: new LinkedVariable(-Infinity) };
+        shadingData.lastLowerBoundary = { x: new LinkedVariable(Infinity), y: new LinkedVariable(Infinity) };
     }
     function finalizeId(_id) {
-        if (_id.includes('final_')) {
+        if (_id.startsWith('final_')) {
             unfinalize(_id);
         }
         else if (_id.includes('_')) {
@@ -1486,30 +1471,29 @@ for (let i = 0; i < expressionFormat.length; i++) {
     }
     function fixNegative() {
         let toFix = [];
-        const negativeab = Calc.getExpressions()
+        const negativeab = MyCalc.getExpressions()
             .filter((x) => /[ab]_{\d*\w+}=-\d+[.]{0,1}\d*/g.test(x.latex)); // Selects ellipse, hyperbola with negative a, b
         toFix = [...toFix, ...negativeab.map((expression) => {
                 expression.latex.replaceAll('-', '');
                 return expression;
             })];
-        Calc.setExpressions(toFix);
+        MyCalc.setExpressions(toFix);
     }
     function deleteById(_id) {
         if (_id.includes('_')) {
             const currId = _id.split('_')[0];
-            console.log(currId);
             if (['shade', 'final'].includes(currId)) {
-                const filteredExpressions = Calc.getExpressions();
+                const filteredExpressions = MyCalc.getExpressions();
                 const expression = filteredExpressions.find((x) => x.id === _id);
                 if (expression) {
-                    Calc.removeExpressions([expression]);
+                    MyCalc.removeExpressions([expression]);
                 }
             }
             else {
                 const idFilter = `${currId}_`;
-                let filteredExpressions = Calc.getExpressions();
+                let filteredExpressions = MyCalc.getExpressions();
                 filteredExpressions = filteredExpressions.filter((x) => x.id.startsWith(idFilter));
-                Calc.removeExpressions(filteredExpressions);
+                MyCalc.removeExpressions(filteredExpressions);
             }
         }
     }
@@ -1517,10 +1501,9 @@ for (let i = 0; i < expressionFormat.length; i++) {
         if (_id.includes('_')) {
             const currId = _id.split('_')[0];
             const idFilter = `${currId}_`;
-            let filteredExpressions = Calc.getExpressions();
-            filteredExpressions = filteredExpressions.filter((x) => x.id.startsWith(idFilter))
-                .filter((x) => !x.id.includes('folder'));
-            const conicExpression = filteredExpressions.find((x) => x.id.includes('_0'));
+            let filteredExpressions = MyCalc.getExpressions();
+            filteredExpressions = filteredExpressions.filter((x) => x.id.startsWith(idFilter) && !x.id.includes('folder'));
+            const conicExpression = filteredExpressions.find((x) => x.id.endsWith('_0'));
             if (!conicExpression) {
                 throw new Error();
             }
@@ -1552,16 +1535,16 @@ for (let i = 0; i < expressionFormat.length; i++) {
                 expressionsToSet.push(expression);
             }
             expressionsToSet.push(conic);
-            Calc.setExpressions(expressionsToSet);
+            MyCalc.setExpressions(expressionsToSet);
         }
     }
     function hideCropLines(_id) {
         if (_id.includes('_')) {
             const idFilter = `${_id.split('_')[0]}_`;
-            let filteredExpressions = Calc.getExpressions();
+            let filteredExpressions = MyCalc.getExpressions();
             filteredExpressions = filteredExpressions.filter((x) => x.id.startsWith(idFilter))
                 .filter((x) => !x.id.includes('folder'));
-            const conicExpression = filteredExpressions.find((x) => x.id.includes('_0'));
+            const conicExpression = filteredExpressions.find((x) => x.id.endsWith('_0'));
             if (!conicExpression) {
                 throw new Error();
             }
@@ -1613,17 +1596,17 @@ for (let i = 0; i < expressionFormat.length; i++) {
                     expressionsToSet.push(newExpression);
                 }
             }
-            Calc.setExpressions(expressionsToSet);
+            MyCalc.setExpressions(expressionsToSet);
         }
     }
     function setId() {
         if (!idSet) {
-            const baseId = Math.max(0, Math.max(...Calc.getExpressions()
-                .filter((x) => x.id.includes('_0'))
+            const baseId = Math.max(0, Math.max(...MyCalc.getExpressions()
+                .filter((x) => x.id.endsWith('_0'))
                 .map((x) => parseInt(x.id.split('_')[0], 10))
                 .filter((x) => !Number.isNaN(x)))) + 1;
-            const finalId = Math.max(0, Math.max(...Calc.getExpressions()
-                .filter((x) => x.id.includes('final_'))
+            const finalId = Math.max(0, Math.max(...MyCalc.getExpressions()
+                .filter((x) => x.id.startsWith('final_'))
                 .map((x) => parseInt(x.id.split('_')[1], 10))
                 .filter((x) => !Number.isNaN(x)))) + 1;
             console.log(baseId, finalId);
@@ -1632,23 +1615,25 @@ for (let i = 0; i < expressionFormat.length; i++) {
         }
     }
     function shadeToBack() {
-        const state = Calc.getState();
+        const state = MyCalc.getState();
         state.expressions.list = state.expressions.list
-            .filter((x) => x.id.includes('shade_'))
-            .concat(state.expressions.list.filter((x) => !x.id.includes('shade_')));
-        Calc.setState(state);
+            .filter((x) => x.id.startsWith('shade_'))
+            .concat(state.expressions.list.filter((x) => !x.id.startsWith('shade_')));
+        MyCalc.setState(state);
     }
     function toggleShading() {
-        const shade = Calc.getExpressions()
-            .filter((x) => x.id.includes('shade_') && !x.id.includes('folder'));
-        Calc.setExpressions(shade.map((_x) => {
+        const shade = MyCalc.getExpressions()
+            .filter((x) => x.id.startsWith('shade_') && !x.id.includes('folder'));
+        const newState = !shade[0].hidden;
+        console.log(newState);
+        MyCalc.setExpressions(shade.map((_x) => {
             const x = _x;
-            x.hidden = !shade[0].hidden;
+            x.hidden = newState;
             return x;
         }));
     }
     function getBoundsById(_id) {
-        const conicExpression = Calc.getExpressions()
+        const conicExpression = MyCalc.getExpressions()
             .find((x) => x.id === _id);
         if (conicExpression) {
             console.log((new Conic(conicExpression))
@@ -1656,13 +1641,13 @@ for (let i = 0; i < expressionFormat.length; i++) {
         }
     }
     function expressionToFront(_id) {
-        const state = Calc.getState();
+        const state = MyCalc.getState();
         const expression = state.expressions.list
             .filter((_expression) => _expression.id === _id);
         const multipleExpressions = state.expressions.list
             .filter((_expression) => _expression.id !== _id);
         state.expressions.list = expression.concat(multipleExpressions);
-        Calc.setState(state);
+        MyCalc.setState(state);
     }
     function keyUpHandler(e) {
         updateVariables();
@@ -1673,10 +1658,10 @@ for (let i = 0; i < expressionFormat.length; i++) {
         if (e.ctrlKey && e.shiftKey) {
             const { key } = e;
             if (key === '<') {
-                expressionToFront(Calc.selectedExpressionId);
+                expressionToFront(MyCalc.selectedExpressionId);
             }
             if (key === 'F') { // F - Finalize
-                finalizeId(Calc.selectedExpressionId);
+                finalizeId(MyCalc.selectedExpressionId);
             }
         }
         if (e.key === 'Alt') {
@@ -1686,7 +1671,7 @@ for (let i = 0; i < expressionFormat.length; i++) {
             altTime = Date.now();
             const { keyCode } = e;
             if (keyCode === 77) {
-                getBoundsById(Calc.selectedExpressionId);
+                getBoundsById(MyCalc.selectedExpressionId);
             }
             if (keyCode === 219) {
                 fixNegative();
@@ -1704,21 +1689,16 @@ for (let i = 0; i < expressionFormat.length; i++) {
                 resetSelection();
             }
             else if (keyCode === 48) {
-                if (e.shiftKey) {
-                    freeze(true);
-                }
-                else {
-                    freeze(false);
-                }
+                freeze(e.shiftKey);
             }
             else if (keyCode === 88) {
-                deleteById(Calc.selectedExpressionId);
+                deleteById(MyCalc.selectedExpressionId);
             }
             else if (keyCode === 81) {
-                changeCropMode(Calc.selectedExpressionId);
+                changeCropMode(MyCalc.selectedExpressionId);
             }
             else if (keyCode === 72) {
-                hideCropLines(Calc.selectedExpressionId);
+                hideCropLines(MyCalc.selectedExpressionId);
             }
         }
         e.preventDefault();
@@ -1731,7 +1711,7 @@ for (let i = 0; i < expressionFormat.length; i++) {
         }
     }
     function fillInside(expressionId) {
-        const expressionList = Calc.getExpressions();
+        const expressionList = MyCalc.getExpressions();
         const object = expressionList.find((expression) => expressionId === expression.id);
         if (object) {
             const conic = new Conic(object);
@@ -1741,12 +1721,12 @@ for (let i = 0; i < expressionFormat.length; i++) {
             else if ([1, 2, 3, 5, 6].includes(conic.conicType)) {
                 conic.latex = conic.latex.replace('=', '<');
             }
-            Calc.setExpression({ color: 'BLACK', hidden: false, type: 'expression', id: `shade_${shadeId}`, latex: conic.latex });
+            MyCalc.setExpression({ color: 'BLACK', hidden: false, type: 'expression', id: `shade_${shadeId}`, latex: conic.latex });
             shadeId += 1;
         }
     }
     function fillIntersection(lowerId, upperId, axis) {
-        const expressionList = Calc.getExpressions();
+        const expressionList = MyCalc.getExpressions();
         const lowerObject = expressionList.find((expression) => lowerId === expression.id);
         const upperObject = expressionList.find((expression) => upperId === expression.id);
         console.log(lowerObject, upperObject);
@@ -1790,17 +1770,13 @@ for (let i = 0; i < expressionFormat.length; i++) {
                     shadeId += 1;
                 }
             }
-            Calc.setExpressions(newExpressions);
+            MyCalc.setExpressions(newExpressions);
         }
         else if (axis === 'x') {
             let realMin = lowerBounds.yMin.value < upperBounds.yMin.value
                 ? upperBounds.yMin : lowerBounds.yMin;
             let realMax = lowerBounds.yMax.value > upperBounds.yMax.value
                 ? upperBounds.yMax : lowerBounds.yMax;
-            const d1 = shadingData.lastUpperBoundary.x.value - realMin.value;
-            const d2 = shadingData.lastLowerBoundary.x.value - realMax.value;
-            console.log(shadingData.lastUpperBoundary.x.value, realMin.value, lastCenterPoint.y, centerPoint.y);
-            console.log(shadingData.lastLowerBoundary.x.value, realMax.value, lastCenterPoint.y, centerPoint.y);
             if (Number.isFinite(lastCenterPoint.y)) {
                 if (shadingData.lastUpperBoundary.x.value > realMin.value && lastCenterPoint.y < centerPoint.y) {
                     realMin = shadingData.lastUpperBoundary.x;
@@ -1826,13 +1802,13 @@ for (let i = 0; i < expressionFormat.length; i++) {
                 }
             }
             console.log(newExpressions);
-            Calc.setExpressions(newExpressions);
+            MyCalc.setExpressions(newExpressions);
         }
     }
     function mouseUpHandler(e) {
         setId();
-        if (Calc.selectedExpressionId) {
-            lastSelectedId = Calc.selectedExpressionId;
+        if (MyCalc.selectedExpressionId) {
+            lastSelectedId = MyCalc.selectedExpressionId;
         }
         updateVariables();
         if (!shadeIdSet) {
@@ -1840,14 +1816,17 @@ for (let i = 0; i < expressionFormat.length; i++) {
             shadeIdSet = true;
         }
         if (currentlyPressed.includes(65)) {
-            selection.push({ id: Calc.selectedExpressionId, pos: { x: e.clientX, y: e.clientY } });
+            const selected = MyCalc.getSelected();
+            if (isConic(selected)) {
+                selection.push({ id: selected.id, pos: { x: e.clientX, y: e.clientY } });
+            }
             if (selection.length >= 2) {
-                const upperSelection = selection.pop();
-                const lowerSelection = selection.pop();
+                const lowerSelection = selection.shift();
+                const upperSelection = selection.shift();
                 if (!upperSelection || !lowerSelection) {
                     throw new Error("This shouldn't happen");
                 }
-                centerPoint = Calc.pixelsToMath({
+                centerPoint = MyCalc.pixelsToMath({
                     x: (upperSelection.pos.x + lowerSelection.pos.x) / 2,
                     y: (upperSelection.pos.x + lowerSelection.pos.y) / 2,
                 });
@@ -1857,7 +1836,7 @@ for (let i = 0; i < expressionFormat.length; i++) {
                 let upperId = upperSelection.id;
                 let lowerId = lowerSelection.id;
                 if (upperId === lowerId) {
-                    const lowerFinal = lowerId.includes('final_');
+                    const lowerFinal = lowerId.startsWith('final_');
                     if (lowerFinal) {
                         unfinalize(lowerId);
                         lowerId = `${lowerId.split('_')[1]}_0`;
@@ -1867,8 +1846,8 @@ for (let i = 0; i < expressionFormat.length; i++) {
                         finalize(lowerId);
                 }
                 else {
-                    const lowerFinal = lowerId.includes('final_');
-                    const upperFinal = upperId.includes('final_');
+                    const lowerFinal = lowerId.startsWith('final_');
+                    const upperFinal = upperId.startsWith('final_');
                     if (lowerFinal) {
                         unfinalize(lowerId);
                         lowerId = `${lowerId.split('_')[1]}_0`;
@@ -1892,38 +1871,14 @@ for (let i = 0; i < expressionFormat.length; i++) {
     document.addEventListener('pointerup', mouseUpHandler, false);
     function toggleArtist() {
         const x = document.querySelector('#artist');
-        if (x.style.display === 'none') {
-            x.style.display = 'block';
-        }
-        else {
-            x.style.display = 'none';
-        }
         const y = document.querySelector('#artist-container');
-        if (y.style.display === 'none') {
-            y.style.display = 'block';
-        }
-        else {
-            y.style.display = 'none';
-        }
-    }
-    function toggleButtons() {
-        const x = document.querySelector('#buttons');
-        if (x.style.display === 'none') {
-            x.style.display = 'block';
-        }
-        else {
-            x.style.display = 'none';
-        }
-        const y = document.querySelector('#artist-container');
-        if (y.style.display === 'none') {
-            y.style.display = 'block';
-        }
-        else {
-            y.style.display = 'none';
-        }
+        if (x)
+            x.style.display = x.style.display === 'none' ? 'block' : 'none';
+        if (y)
+            y.style.display = y.style.display === 'none' ? 'block' : 'none';
     }
     function changeColor() {
-        const expressions = Calc.getExpressions();
+        const expressions = MyCalc.getExpressions();
         const conicExpression = expressions.find((expression) => expression.id === lastSelectedId);
         if (conicExpression) {
             const colorForm = $('#colorForm');
@@ -1932,7 +1887,7 @@ for (let i = 0; i < expressionFormat.length; i++) {
                 data.forEach((pair) => {
                     conicExpression[pair.name] = pair.value;
                 });
-                Calc.setExpression(conicExpression);
+                MyCalc.setExpression(conicExpression);
             }
         }
     }
@@ -1947,7 +1902,8 @@ for (let i = 0; i < expressionFormat.length; i++) {
     function createConicHandler() {
         createConic(currConicId);
     }
-    unsafeWindow.onload = () => {
+    function load() {
+        MyCalc = new MyCalcClass(Calc);
         const pillbox = unsafeWindow.document.querySelector('.dcg-overgraph-pillbox-elements');
         console.log(pillbox);
         if (pillbox) {
@@ -1967,13 +1923,19 @@ for (let i = 0; i < expressionFormat.length; i++) {
         if (body) {
             body.insertAdjacentHTML('beforeend', '<div id="artist" style="position: absolute; bottom: 5%; right: 5%; padding: 10px; border: 1px solid black; border-radius: 10px"><form id="colorForm" onSubmit="return changeColor()"><div> Color <input name="color" type="color"></div><div> Opacity <input name="fillOpacity" type="number" min="0" max="1" value="0.4"></div><div><input type="button" value="Apply" onclick="changeColor()"></div></form></div>');
         }
-    };
+    }
+    (async () => {
+        while (typeof Calc === 'undefined') {
+            await new Promise((resolve) => setTimeout(resolve, 1000));
+        }
+        load();
+    })();
     unsafeWindow.idSet = idSet;
     unsafeWindow.id = id;
     unsafeWindow.Conic = Conic;
-    unsafeWindow.toggleButtons = toggleButtons;
     unsafeWindow.changeColor = changeColor;
     unsafeWindow.changeConicType = changeConicType;
     unsafeWindow.createConicHandler = createConicHandler;
+    unsafeWindow.globalVariablesObject = globalVariablesObject;
     unsafeWindow.toggleArtist = toggleArtist;
 })();
