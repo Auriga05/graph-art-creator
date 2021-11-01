@@ -1600,17 +1600,19 @@ let MyCalc;
         }
     }
     function setId() {
-        const baseId = Math.max(0, Math.max(...MyCalc.getExpressions()
-            .filter((x) => x.id.endsWith('_0'))
-            .map((x) => parseInt(x.id.split('_')[0], 10))
-            .filter((x) => !Number.isNaN(x)))) + 1;
-        const finalId = Math.max(0, Math.max(...MyCalc.getExpressions()
-            .filter((x) => x.id.startsWith('final_'))
-            .map((x) => parseInt(x.id.split('_')[1], 10))
-            .filter((x) => !Number.isNaN(x)))) + 1;
-        console.log(baseId, finalId);
-        id = Math.max(baseId, finalId);
-        idSet = true;
+        if (!setId) {
+            const baseId = Math.max(0, Math.max(...MyCalc.getExpressions()
+                .filter((x) => x.id.endsWith('_0'))
+                .map((x) => parseInt(x.id.split('_')[0], 10))
+                .filter((x) => !Number.isNaN(x)))) + 1;
+            const finalId = Math.max(0, Math.max(...MyCalc.getExpressions()
+                .filter((x) => x.id.startsWith('final_'))
+                .map((x) => parseInt(x.id.split('_')[1], 10))
+                .filter((x) => !Number.isNaN(x)))) + 1;
+            console.log(baseId, finalId);
+            id = Math.max(baseId, finalId);
+            idSet = true;
+        }
     }
     function shadeToBack() {
         const state = MyCalc.getState();
