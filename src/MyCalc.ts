@@ -115,7 +115,6 @@ export class MyCalcClass {
         }
       }
     });
-    console.log(maxNumber)
     this.updateExpressions(expressionsToSet);
   }
 
@@ -184,13 +183,10 @@ export class MyCalcClass {
     } else {
       this.Calc.removeExpression(expression);
       const split = expression.id.split('_')
-      console.log(split)
       if (['final', 'shade'].includes(split[0])) {
-        console.log(split)
         const id = parseInt(split[1])
         this.usedId = this.usedId.filter(_id => _id !== id)
       } else {
-        console.log(split)
         const id = parseInt(split[0])
         this.usedId = this.usedId.filter(_id => _id !== id)
       }
@@ -343,7 +339,7 @@ export class MyCalcClass {
     } else {
       if (reference) {
         if (reference in this.linkedVariables) {
-          if (_value) {console.log(`Set ${reference} to ${_value} from ${this.linkedVariables[reference].value}`)
+          if (_value) {
             this.linkedVariables[reference].value = _value
           }
           return this.linkedVariables[reference]
@@ -359,7 +355,6 @@ export class MyCalcClass {
   addLinkedVariable(linkedVariable: LinkedVariable) {
     if (linkedVariable.reference) {
       if (linkedVariable.reference in this.linkedVariables) {
-        console.log(`Set ${linkedVariable.reference} to ${linkedVariable.value} from ${this.linkedVariables[linkedVariable.reference].value}`)
         this.linkedVariables[linkedVariable.reference] = linkedVariable
       } else {
         this.linkedVariables[linkedVariable.reference] = linkedVariable

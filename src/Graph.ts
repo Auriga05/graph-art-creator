@@ -257,7 +257,6 @@ export abstract class Graph implements Expression {
 
     endpoints.forEach((endpoint) => {
       const sqrMagnitude = (endpoint.x.value - point.x) ** 2 + (endpoint.y.value - point.y) ** 2;
-      console.log(sqrMagnitude, currEndPoint)
       if (sqrMagnitude < currEndPoint.currMinSqrMagnitude) {
         currEndPoint.endpoint = endpoint;
         currEndPoint.currMinSqrMagnitude = sqrMagnitude;

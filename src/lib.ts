@@ -358,13 +358,10 @@ export function substituteFromId(_latex: string, expressionId: number) {
   for (let j = 0; j < variablesNeeded.length; j++) {
     const variableNeeded = variablesNeeded[j][0];
     if (usesVariable(variableNeeded, expressionId)) {
-      console.log(_latex, variableNeeded)
       const variableValue = simplify(getVariable(variableNeeded), 4);
       latex = latex.replace(variableNeeded, `(${variableValue})`);
-      console.log(variableNeeded, variableValue);
     }
   }
-  console.log(latex);
   return latex;
 }
 
@@ -373,7 +370,6 @@ export function setVariable(variable: string, _value: string | number) {
   if (typeof value === 'number') {
     value = value.toString();
   }
-  console.log(value)
   if (value == undefined) {
     throw Error('undefined bruh what')
   }
