@@ -101,7 +101,7 @@ export class MyCalcClass {
         }
         if (expression.id.includes('_')) {
           const split = expression.id.split('_')
-          if (!['final', 'shade'].includes(split[1])) {
+          if (!['final', 'shade'].includes(split[0])) {
             const id = parseInt(split[0])
             const num = parseInt(split[1])
             if (id in maxNumber) {
@@ -161,6 +161,21 @@ export class MyCalcClass {
   }
 
   removeExpressions(expressions: Expression[]) {
+    expressions.forEach((expression) => {
+      const split = expression.id.split('_')
+      console.log(split)
+      if (['final', 'shade'].includes(split[0])) {
+        const id = parseInt(split[1])
+        if (this.usedId.includes(id)) {
+          this.usedId = this.usedId.filter(_id => _id !== id)
+        }
+      } else {
+        const id = parseInt(split[0])
+        if (this.usedId.includes(id)) {
+          this.usedId = this.usedId.filter(_id => _id !== id)
+        }
+      }
+    })
     this.Calc.removeExpressions(expressions);
   }
 
@@ -169,6 +184,16 @@ export class MyCalcClass {
       delete this.logicalExpressions[expression.id]
     } else {
       this.Calc.removeExpression(expression);
+      const split = expression.id.split('_')
+      if (['final', 'shade'].includes(split[0])) {
+        console.log(split)
+        const id = parseInt(split[1])
+        this.usedId = this.usedId.filter(_id => _id !== id)
+      } else {
+        console.log(split)
+        const id = parseInt(split[0])
+        this.usedId = this.usedId.filter(_id => _id !== id)
+      }
     }
   }
 

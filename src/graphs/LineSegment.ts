@@ -1,4 +1,5 @@
 import { Graph } from "../Graph";
+import { MyCalc } from "../index.user";
 import { Expression, getVariable, LinkedVariable, substitute, getDomains, minMax, setVariable } from "../lib";
 
 export class LineSegment extends Graph {

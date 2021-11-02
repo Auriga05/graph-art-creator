@@ -8,3 +8,5 @@ test.html
 tsconfig.json
 index.user.ts
 evaluatex.js
+index-experimental.user.js
+index-hotfix.user.js

@@ -95,7 +95,29 @@ export abstract class Graph implements Expression {
     return [...xPoints, ...yPoints]
   }
   getBounds() {
-    let { xMin, yMin, xMax, yMax } = this.getRealBounds();
+    const { graphId } = this;
+    let { xMin, yMin, xMax, yMax } = getDomains(graphId);
+    const { specialPoints, cropPoints } = this.getEndpoints();
+    const points = [...specialPoints, ...cropPoints];
+    const innerPoints = points.filter((point) => (xMin.value <= point.x.value)
+      && (point.x.value <= xMax.value)
+      && (yMin.value <= point.y.value)
+      && (point.y.value <= yMax.value));
+
+    const x1 = minLinkedVariable(innerPoints.map((point) => point.x));
+    const x2 = maxLinkedVariable(innerPoints.map((point) => point.x));
+    const y1 = minLinkedVariable(innerPoints.map((point) => point.y));
+    const y2 = maxLinkedVariable(innerPoints.map((point) => point.y));
+
+    const x1s = minLinkedVariable(specialPoints.map((point) => point.x));
+    const x2s = maxLinkedVariable(specialPoints.map((point) => point.x));
+    const y1s = minLinkedVariable(specialPoints.map((point) => point.y));
+    const y2s = maxLinkedVariable(specialPoints.map((point) => point.y));
+
+    xMin = maxLinkedVariable([xMin, x1]);
+    yMin = maxLinkedVariable([yMin, y1]);
+    xMax = minLinkedVariable([xMax, x2]);
+    yMax = minLinkedVariable([yMax, y2]); 
     const cropType = this.getCropType();
 
     const {
@@ -105,10 +127,10 @@ export abstract class Graph implements Expression {
       yMax: yMaxDomain,
     } = getDomains(this.graphId);
 
-    xMin = parseFloat(xMinDomain.value.toFixed(4)) < parseFloat(xMin.value.toFixed(4)) ? MyCalc.linkedVariable(-Infinity) : xMinDomain;
-    xMax = parseFloat(xMaxDomain.value.toFixed(4)) > parseFloat(xMax.value.toFixed(4)) ? MyCalc.linkedVariable(Infinity) : xMaxDomain;
-    yMin = parseFloat(yMinDomain.value.toFixed(4)) < parseFloat(yMin.value.toFixed(4)) ? MyCalc.linkedVariable(-Infinity) : yMinDomain;
-    yMax = parseFloat(yMaxDomain.value.toFixed(4)) > parseFloat(yMax.value.toFixed(4)) ? MyCalc.linkedVariable(Infinity) : yMaxDomain;
+    xMin = parseFloat(xMinDomain.value.toFixed(4)) < parseFloat(xMin.value.toFixed(4)) ? xMin : xMinDomain
+    xMax = parseFloat(xMaxDomain.value.toFixed(4)) > parseFloat(xMax.value.toFixed(4)) ? xMax : xMaxDomain;
+    yMin = parseFloat(yMinDomain.value.toFixed(4)) < parseFloat(yMin.value.toFixed(4)) ? yMin : yMinDomain;
+    yMax = parseFloat(yMaxDomain.value.toFixed(4)) > parseFloat(yMax.value.toFixed(4)) ? yMax : yMaxDomain;
 
     xMin = hasXDomain(cropType) ? xMin : MyCalc.linkedVariable(-Infinity);
     xMax = hasXDomain(cropType) ? xMax : MyCalc.linkedVariable(Infinity);

@@ -373,6 +373,10 @@ export function setVariable(variable: string, _value: string | number) {
   if (typeof value === 'number') {
     value = value.toString();
   }
+  console.log(value)
+  if (value == undefined) {
+    throw Error('undefined bruh what')
+  }
   MyCalc.globalVariablesObject[variable] = value;
 }
 

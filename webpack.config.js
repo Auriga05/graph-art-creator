@@ -18,7 +18,7 @@ module.exports = {
     extensions: ['.tsx', '.ts', '.js'],
   },
   output: {
-    filename: 'index.user.js',
+    filename: 'index-experimental.user.js',
     path: __dirname,
   },
   plugins: [

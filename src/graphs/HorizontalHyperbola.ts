@@ -1,4 +1,5 @@
 import { Graph } from "../Graph";
+import { MyCalc } from "../index.user";
 import { Expression, getVariable, LinkedVariable, getDomains, substitute, simplify, setVariable } from "../lib";
 
 export class HorizontalHyperbola extends Graph {
