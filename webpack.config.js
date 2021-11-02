@@ -24,11 +24,11 @@ module.exports = {
   plugins: [
     new webpack.BannerPlugin({
       banner: `// ==UserScript==
-// @name         Precal thing
+// @name         Graph Art Creator - Experimental
 // @namespace    http://tampermonkey.net/
-// @version      0.1.2
+// @version      1.0a
 // @description  precal thing
-// @author       You (not Watanabe)
+// @author       Auriga05
 // @match        https://www.desmos.com/calculator*
 // @icon         https://www.google.com/s2/favicons?domain=desmos.com
 // @grant        unsafeWindow
