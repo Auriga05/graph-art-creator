@@ -163,7 +163,6 @@ export class MyCalcClass {
   removeExpressions(expressions: Expression[]) {
     expressions.forEach((expression) => {
       const split = expression.id.split('_')
-      console.log(split)
       if (['final', 'shade'].includes(split[0])) {
         const id = parseInt(split[1])
         if (this.usedId.includes(id)) {
@@ -185,6 +184,7 @@ export class MyCalcClass {
     } else {
       this.Calc.removeExpression(expression);
       const split = expression.id.split('_')
+      console.log(split)
       if (['final', 'shade'].includes(split[0])) {
         console.log(split)
         const id = parseInt(split[1])
@@ -286,7 +286,7 @@ export class MyCalcClass {
   }
 
   getItemCount() {
-    this.Calc.controller.getItemCount()
+    return this.Controller.getItemCount()
   }
 
   isLogical(id: string) {
@@ -313,16 +313,16 @@ export class MyCalcClass {
       type: "table",
       columns: [
         {
-          latex: "x_{1}",
+          latex: "r_{x}",
           color: "BLACK",
           id: "reg_1",
-          values: [points.map((point) => point.x.toString())]
+          values: points.map((point) => parseFloat(point.x.toFixed(4)))
         },
         {
-          latex: "y_{1}",
+          latex: "r_{y}",
           color: "BLACK",
           id: "reg_2",
-          values: [points.map((point) => point.y.toString())]
+          values: points.map((point) => parseFloat(point.y.toFixed(4)))
         }
       ]
     }
@@ -330,6 +330,10 @@ export class MyCalcClass {
   }
 
   regression(points: {x: number, y: number}[]) {
+    const newExp = {
+      reg: "r_{A}r_{x}^{2}+r_{C}r_{x}^{2}+r_{D}r_{x}+r_{E}r_{y}+r_{F}\\sim0\\left\{\\frac{r_{F}^{2}}{r_{A}r_{C}}>1\\right\\}",
+      reg_exp: "r_{A}r_{x}^{2}+r_{C}r_{x}^{2}+r_{D}r_{x}+r_{E}r_{y}+r_{F}\\sim0\\left\\{\\frac{r_{F}^{2}}{r_{A}r_{C}}>1\\right\\}"
+    }
     this.setExpression(this.table(points))
   }
 
