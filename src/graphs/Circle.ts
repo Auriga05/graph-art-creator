@@ -1,4 +1,6 @@
-import { Graph, HasCrop } from "../Graph";
+import { Conic } from "../classes/Conic";
+import { Graph, HasCrop } from "../classes/Graph";
+import { defaultExpressionFormat, xExpressions, yExpressions } from "../constants";
 import { MyCalc } from "../index.user";
 import { Expression, getVariable, LinkedVariable, getDomains, substitute, generateBounds, simplify, setVariable } from "../lib";
 
@@ -8,9 +10,23 @@ export interface CircleVariables {
   r: number,
 }
 
-export class Circle extends Graph {
+export class Circle extends Graph implements Initializable, Conic {
   static hasCenter = true;
   static hasCrop = true;
+  isConic = true;
+  static expressionFormat = [ // Circle (x or y)
+    { latex: '\\left(x-h_{1}\\right)^{2}+\\left(y-k_{1}\\right)^{2}=r_{1}^{2}', types: ['graph'], name: 'graph' },
+    { latex: '\\left(h_{1},k_{1}\\right)', types: ['point', 'hide'] },
+    { latex: '\\left(h_{1}+a_{1},k_{1}+b_{1}\\right)', types: ['point', 'hide'] },
+    { latex: 'r_{1}=\\sqrt{a_{1}^{2}+b_{1}^{2}}', types: ['helper_var'], name: 'r' },
+    { latex: 'h_{1}=0', types: ['var'], name: 'h' },
+    { latex: 'k_{1}=0', types: ['var'], name: 'k' },
+    { latex: 'a_{1}=1', types: ['var'], name: 'a' },
+    { latex: 'b_{1}=0', types: ['var'], name: 'b' },
+    ...defaultExpressionFormat,
+    ...yExpressions[0].map((yExpression, c) => ({ latex: `f_{1y${String.fromCharCode(97 + c)}}(x)=${yExpression}`, types: ['y_expression'], name: `f_{1y${String.fromCharCode(97 + c)}}` })),
+    ...xExpressions[0].map((xExpression, c) => ({ latex: `f_{1x${String.fromCharCode(97 + c)}}(y)=${xExpression}`, types: ['x_expression'], name: `f_{1x${String.fromCharCode(97 + c)}}` })),
+  ]
   constructor(expression: Expression) {
     super(expression, 0);
   }

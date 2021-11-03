@@ -1,4 +1,6 @@
 import { createGraphObject, Expression, functionRegex, intersectConics, LinkedVariable, usesVariable } from "./lib";
+import { parse } from 'svg-parser'
+import { Conic } from "./classes/Conic";
 interface ExpressionAnalysis { evaluation ? : { type: string
   value: number
 }
@@ -388,7 +390,25 @@ export class MyCalcClass {
       const aGraph = createGraphObject(aExpression)
       const bGraph = createGraphObject(bExpression)
 
-      intersectConics(aGraph, bGraph)
+      // if (aGraph.isConic && bGraph.isConic) {
+      //   intersectConics(aGraph, bGraph)
+      // }
     }
+  }
+
+  xhr () {
+    const url = "https://upload.wikimedia.org/wikipedia/commons/f/f7/Bananas.svg"
+    fetch(url)
+       .then( r => r.text() )
+       .then( t => {
+         const svg = parse(t)
+         console.log(svg)
+         const children = svg.children[0]
+         if (children.type === "element") {
+           if (children.tagName === "g") {
+             console.log(children.children)
+           }
+         }
+    })
   }
 }

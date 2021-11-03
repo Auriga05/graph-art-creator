@@ -1,7 +1,5 @@
-import { baseExpressionFormat } from "./constants";
-import { Graph } from "./Graph";
+import { Graph } from "./classes/Graph";
 import { MyCalc } from "./index.user";
-import nerdamer from "./nerdamer/index.js"
 import { Circle } from './graphs/Circle'
 import { Ellipse } from './graphs/Ellipse';
 import { HorizontalHyperbola } from './graphs/HorizontalHyperbola';
@@ -9,6 +7,9 @@ import { HorizontalParabola } from './graphs/HorizontalParabola';
 import { LineSegment } from './graphs/LineSegment';
 import { VerticalHyperbola } from './graphs/VerticalHyperbola';
 import { VerticalParabola } from './graphs/VerticalParabola';
+import { Conic } from "./classes/Conic";
+import { Coordinate } from "./bezierLib";
+import { Bezier } from "./graphs/Bezier";
  
 export const GraphTypes = [
   Circle,
@@ -17,8 +18,15 @@ export const GraphTypes = [
   Ellipse,
   HorizontalHyperbola,
   VerticalHyperbola,
-  LineSegment
+  LineSegment,
+  Bezier,
 ]
+
+export const baseExpressionFormat: string[] = [];
+for (let i = 0; i < GraphTypes.length; i++) {
+  const expression = GraphTypes[i].expressionFormat;
+  baseExpressionFormat.push(expression[0].latex);
+}
 
 export type EvaluatexType = (equation: string, variables ? : {
   [key: string]: number
@@ -450,7 +458,27 @@ class Matrix {
   }
 }
 
-export function intersectConics(aGraph: Graph, bGraph: Graph) {
+export function toId(expression: string, _id: string | number) {
+  return expression.replace(/_\{\d+([a-z]*)}/g, `_{${_id}$1}`);
+}
+
+export function intersect(array1: string[], array2: string[]) {
+  return array1.filter((value) => array2.includes(value));
+}
+
+export function doesIntersect(array1: string[], array2: string[]) {
+  const filteredArray = intersect(array1, array2);
+  return (filteredArray.length > 0);
+}
+
+export function typeFilter(expressionList: Expression[], graphType: number, types: string[]) {
+  const ceTypes = GraphTypes[graphType].expressionFormat;
+  return expressionList.filter((x) => doesIntersect(
+    ceTypes[parseInt(x.id.split('_')[1], 10)].types, types,
+  ));
+}
+
+export function intersectConics(aGraph: Conic, bGraph: Conic) {
   let {A: A_1, C: C_1, D: D_1, E: E_1, F: F_1} = aGraph.getGeneralForm()
   let {A: A_2, C: C_2, D: D_2, E: E_2, F: F_2} = bGraph.getGeneralForm()
   A_1 = A_1
@@ -507,8 +535,6 @@ export function intersectConics(aGraph: Graph, bGraph: Graph) {
   console.log(t)
   console.log(matrix)
   console.log(matrix.toReducedRowEchelonForm())
-
-  console.log(nerdamer('(-A_2*E_2^2-C_2*D_2^2+A_2*C_2*F_2)*t^3+(-2*A_2*E_1*E_2-2*C_2*D_1*D_2-A_1*E_2^2-C_1*D_2^2+A_1*C_2*F_2+A_2*C_1*F_2+A_2*C_2*F_1)*t^2+(0-2*A_1*E_1*E_2-2*C_1*D_1*D_2-A_2*E_1^2-C_2*D_1^2+A_1*C_1*F_2+A_1*C_2*F_1+A_2*C_1*F_1)*t+(-A_1*E_1^2-C_1*D_1^2+A_1*C_1*F_1) = 0', variables).solveFor('t').toString())
   console.log(performance.now() - startTime)
 }
 
@@ -519,4 +545,66 @@ export function createGraphObject(expression: Expression) {
     return new Class(expression);
   }
   throw Error('Tried to convert non-conic to a conic');
+}
+
+export function createConic(graphType: number, id: number) {
+  const expression = GraphTypes[graphType].expressionFormat;
+  const expressionsToSet = [];
+  for (let i = 0; i < expression.length; i++) {
+    const newExpression = expression[i];
+    let newExpressionLatex = newExpression.latex;
+    if (i === 0) {
+      if (GraphTypes[graphType].hasCrop) {
+        newExpressionLatex += '\\left\\{x_{1ca}<x<x_{1cb}\\right\\}\\left\\{y_{1ca}<y<y_{1cb}\\right\\}';
+      }
+    }
+    newExpressionLatex = newExpressionLatex.replace(/_\{\d+([a-z]*)}/g, `_{${id}$1}`);
+    if (doesIntersect(newExpression.types, ['var'])) {
+      const [variable] = newExpressionLatex.split('=');
+      const value = MyCalc.globalVariablesObject[toId(variable, id)];
+      newExpressionLatex = `${variable}=${simplify(parseFloat(value), 4)}`;
+    }
+    const hidden = doesIntersect(
+      expression[i].types,
+      ['x_expression', 'y_expression'],
+    );
+    if (hidden) {
+      const split = newExpressionLatex.split('=');
+      const matches = [...split[0].matchAll(functionRegex)]
+      if (matches.length > 0) {
+        const [full, name, args] = matches[0];
+        MyCalc.globalFunctionsObject[name] = {
+          id: `${id.toString()}_${i}`,
+          args: args.split(','),
+          definition: split[1],
+        }
+      }
+    }
+    expressionsToSet.push({ id: `${id.toString()}_${i}`,
+      latex: newExpressionLatex,
+      color: 'BLACK',
+      hidden,
+      type: 'expression' });
+  }
+  MyCalc.newGraph(id, expressionsToSet);
+}
+
+export function createBezier(
+  p1: Coordinate,
+  p2: Coordinate,
+  p3: Coordinate,
+  p4: Coordinate,
+  id: number
+){
+  Bezier.setGraphVariables({
+    xa: p1.x,
+    ya: p1.y,
+    xb: p2.x,
+    yb: p2.y,
+    xc: p3.x,
+    yc: p3.y,
+    xd: p4.x,
+    yd: p4.y
+  }, id)
+  createConic(7, id)
 }

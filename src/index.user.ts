@@ -13,10 +13,10 @@
 // @require      https://cdn.jsdelivr.net/npm/evaluatex@2.2.0/dist/evaluatex.min.js
 // ==/UserScript==
 
-import { LinkedVariable, Expression, getGraphType, parseDomains, simplify, generateBounds, substituteParenthesis, substituteFromId, usesVariable, functionRegex, setVariable, Bounds, NumberBounds, GraphTypes, createGraphObject} from './lib'
-import { Graph } from './Graph'
-import { expressionFormat } from './constants';
+import { LinkedVariable, Expression, getGraphType, parseDomains, simplify, generateBounds, substituteParenthesis, substituteFromId, usesVariable, functionRegex, setVariable, Bounds, NumberBounds, GraphTypes, createGraphObject, doesIntersect, typeFilter, createConic, createBezier, toId} from './lib'
+import { Graph } from './classes/Graph'
 import { CalcType, MyCalcClass } from './MyCalc';
+import { getCriticalPoints } from './bezierLib';
 
 interface SelectionObject {
   id: string
@@ -26,7 +26,7 @@ interface SelectionObject {
 }
 
 declare const Calc: CalcType;
-declare const unsafeWindow: { Conic?: typeof Graph
+declare const unsafeWindow: { Graph ?: typeof Graph
   onload: number
   document: Document
   changeColor: () => void
@@ -123,22 +123,6 @@ function main() {
     }
   }
 
-  function intersect(array1: string[], array2: string[]) {
-    return array1.filter((value) => array2.includes(value));
-  }
-
-  function doesIntersect(array1: string[], array2: string[]) {
-    const filteredArray = intersect(array1, array2);
-    return (filteredArray.length > 0);
-  }
-
-  function typeFilter(expressionList: Expression[], graphType: number, types: string[]) {
-    const ceTypes = expressionFormat[graphType];
-    return expressionList.filter((x) => doesIntersect(
-      ceTypes[parseInt(x.id.split('_')[1], 10)].types, types,
-    ));
-  }
-
   function getDomainsFromLatex(latex: string) {
     return [
       ...latex.matchAll(/\\left\\{((?:[-+]?\d+\.?\d*<)?[xy](?:<[-+]?\d+\.?\d*)?)\\right\\}/g),
@@ -147,10 +131,6 @@ function main() {
 
   function transformVariables(graphType: number, variables: number[]) {
     return GraphTypes[graphType].transformVariables(variables)
-  }
-
-  function toId(expression: string, _id: string | number) {
-    return expression.replace(/_\{\d+([a-z]*)}/g, `_{${_id}$1}`);
   }
 
   function createGraphWithBounds(graphId: number, graphType: number, variables: any, _bounds: NumberBounds, _logical?: boolean) {
@@ -167,7 +147,7 @@ function main() {
     let h = 0;
     let k = 0;
 
-    const expression = expressionFormat[graphType];
+    const expression = GraphTypes[graphType].expressionFormat;
     const expressionsToSet = [];
 
     GraphTypes[graphType].setGraphVariables(variables, graphId)
@@ -408,49 +388,6 @@ function main() {
     }
   }
 
-  function createConic(graphType: number) {
-    const expression = expressionFormat[graphType];
-    const expressionsToSet = [];
-    for (let i = 0; i < expression.length; i++) {
-      const newExpression = expression[i];
-      let newExpressionLatex = newExpression.latex;
-      if (i === 0) {
-        if (graphType !== 6) {
-          newExpressionLatex += '\\left\\{x_{1ca}<x<x_{1cb}\\right\\}\\left\\{y_{1ca}<y<y_{1cb}\\right\\}';
-        }
-      }
-      newExpressionLatex = newExpressionLatex.replace(/_\{\d+([a-z]*)}/g, `_{${globalId}$1}`);
-      if (doesIntersect(newExpression.types, ['var'])) {
-        const [variable] = newExpressionLatex.split('=');
-        const value = MyCalc.globalVariablesObject[toId(variable, globalId)];
-        newExpressionLatex = `${variable}=${simplify(parseFloat(value), 4)}`;
-      }
-      const hidden = doesIntersect(
-        expression[i].types,
-        ['x_expression', 'y_expression'],
-      );
-      if (hidden) {
-        const split = newExpressionLatex.split('=');
-        const matches = [...split[0].matchAll(functionRegex)]
-        if (matches.length > 0) {
-          const [full, name, args] = matches[0];
-          MyCalc.globalFunctionsObject[name] = {
-            id: `${globalId.toString()}_${i}`,
-            args: args.split(','),
-            definition: split[1],
-          }
-        }
-      }
-      expressionsToSet.push({ id: `${globalId.toString()}_${i}`,
-        latex: newExpressionLatex,
-        color: 'BLACK',
-        hidden,
-        type: 'expression' });
-    }
-    MyCalc.newGraph(globalId, expressionsToSet);
-    globalId += 1;
-  }
-
   function createDefaultConic(graphType: number) {
     const coordinates = MyCalc.graphpaperBounds.mathCoordinates;
     expressionPos = { x: parseFloat(((coordinates.left + coordinates.right) / 2).toFixed(4)), y: parseFloat(((coordinates.top + coordinates.bottom) / 2).toFixed(4)) };
@@ -468,7 +405,8 @@ function main() {
       setVariable(`x_{${globalId}cbm}`, size * 0.4);
       setVariable(`y_{${globalId}cbm}`, size * 0.4);
     }
-    createConic(graphType)
+    createConic(graphType, globalId)
+    globalId += 1
   }
 
   function freeze(force: boolean, append?: boolean) {
@@ -960,7 +898,8 @@ function main() {
         } else {
           easySelections.push(MyCalc.pixelsToMath({ x: e.clientX, y: e.clientY }));
         }
-      } else if (e.button == 1) {
+      }
+      if (e.button == 1 || easySelections.length === 4) {
         if (easySelections.length === 1) {
 
         } 
@@ -969,10 +908,19 @@ function main() {
           setVariable(`y_{${globalId}a}`, easySelections[0].y);
           setVariable(`x_{${globalId}b}`, easySelections[1].x);
           setVariable(`y_{${globalId}b}`, easySelections[1].y);
-          createConic(6)
+          createConic(6, globalId)
+          globalId += 1
         }
         if (easySelections.length === 4) {
-          MyCalc.regression(easySelections)
+          const criticalPoints = createBezier(
+            easySelections[0],
+            easySelections[1],
+            easySelections[2],
+            easySelections[3],
+            globalId
+          )
+          console.log(criticalPoints)
+          // MyCalc.regression(easySelections)
         }
         easySelections = []
       }
@@ -1101,9 +1049,7 @@ function main() {
   }
 
   unsafeWindow.MyCalc = MyCalc;
-  unsafeWindow.idSet = idSet;
-  unsafeWindow.id = globalId;
-  unsafeWindow.Conic = Graph;
+  unsafeWindow.Graph = Graph;
   unsafeWindow.changeColor = changeColor;
   unsafeWindow.changegraphType = changegraphType;
   unsafeWindow.createConicHandler = createConicHandler;
