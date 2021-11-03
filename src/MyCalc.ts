@@ -1,5 +1,4 @@
-import { Expression, functionRegex, LinkedVariable, usesVariable } from "./lib";
-
+import { createGraphObject, Expression, functionRegex, intersectConics, LinkedVariable, usesVariable } from "./lib";
 interface ExpressionAnalysis { evaluation ? : { type: string
   value: number
 }
@@ -368,5 +367,28 @@ export class MyCalcClass {
         this.linkedVariables[linkedVariable.reference].clean = false
       }
     })
+  }
+
+  getConicById(id: number) {
+    let graph = this.getExpression(`final_${id}`)
+    if (!graph) {
+      graph = this.getExpression(`${id}_0`)  
+      if (!graph) {
+        return undefined
+      }
+    }
+    return graph
+  }
+
+  intersectConicsById(a: number, b: number) {
+    const aExpression = this.getConicById(a)
+    const bExpression = this.getConicById(b)
+
+    if (aExpression && bExpression) {
+      const aGraph = createGraphObject(aExpression)
+      const bGraph = createGraphObject(bExpression)
+
+      intersectConics(aGraph, bGraph)
+    }
   }
 }

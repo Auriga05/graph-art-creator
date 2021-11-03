@@ -1,5 +1,24 @@
 import { baseExpressionFormat } from "./constants";
+import { Graph } from "./Graph";
 import { MyCalc } from "./index.user";
+import nerdamer from "./nerdamer/index.js"
+import { Circle } from './graphs/Circle'
+import { Ellipse } from './graphs/Ellipse';
+import { HorizontalHyperbola } from './graphs/HorizontalHyperbola';
+import { HorizontalParabola } from './graphs/HorizontalParabola';
+import { LineSegment } from './graphs/LineSegment';
+import { VerticalHyperbola } from './graphs/VerticalHyperbola';
+import { VerticalParabola } from './graphs/VerticalParabola';
+ 
+export const GraphTypes = [
+  Circle,
+  HorizontalParabola,
+  VerticalParabola,
+  Ellipse,
+  HorizontalHyperbola,
+  VerticalHyperbola,
+  LineSegment
+]
 
 export type EvaluatexType = (equation: string, variables ? : {
   [key: string]: number
@@ -379,4 +398,125 @@ export function setVariable(variable: string, _value: string | number) {
 export interface LinkedCoordinate {
   x: LinkedVariable
   y: LinkedVariable
+}
+
+class Matrix {
+  mtx: number[][]
+  height: number
+  width: number
+  constructor (ary: number[][]) {
+    this.mtx = ary
+    this.height = ary.length;
+    this.width = ary[0].length;
+  }
+
+  toReducedRowEchelonForm() {
+    let lead = 0;
+    for (let r = 0; r < this.height; r++) {
+        if (this.width <= lead) {
+            return;
+        }
+        let i = r;
+        while (this.mtx[i][lead] == 0) {
+            i++;
+            if (this.height == i) {
+                i = r;
+                lead++;
+                if (this.width == lead) {
+                    return;
+                }
+            }
+        }
+
+        const tmp = this.mtx[i];
+        this.mtx[i] = this.mtx[r];
+        this.mtx[r] = tmp;
+
+        let val = this.mtx[r][lead];
+        for (let j = 0; j < this.width; j++) {
+            this.mtx[r][j] /= val;
+        }
+
+        for (let i = 0; i < this.height; i++) {
+            if (i == r) continue;
+            val = this.mtx[i][lead];
+            for (let j = 0; j < this.width; j++) {
+                this.mtx[i][j] -= val * this.mtx[r][j];
+            }
+        }
+        lead++;
+    }
+    return this;
+  }
+}
+
+export function intersectConics(aGraph: Graph, bGraph: Graph) {
+  let {A: A_1, C: C_1, D: D_1, E: E_1, F: F_1} = aGraph.getGeneralForm()
+  let {A: A_2, C: C_2, D: D_2, E: E_2, F: F_2} = bGraph.getGeneralForm()
+  A_1 = A_1
+  C_1 = C_1
+  D_1 = D_1 / 2
+  E_1 = E_1 / 2
+  F_1 = F_1
+  A_2 = A_2
+  C_2 = C_2
+  D_2 = D_2 / 2
+  E_2 = E_2 / 2
+  F_2 = F_2
+  const _variables = { A_1, C_1, D_1, E_1, F_1, A_2, C_2, D_2, E_2, F_2 }
+  const variables: {[key: string]: string} = {}
+  Object.entries(_variables).map((value) => {
+    variables[value[0]] = value[1].toString()
+  })
+  const a = -A_2*E_2**2-C_2*D_2**2+A_2*C_2*F_2
+  const b = -2*A_2*E_1*E_2-2*C_2*D_1*D_2-A_1*E_2**2-C_1*D_2**2+A_1*C_2*F_2+A_2*C_1*F_2+A_2*C_2*F_1
+  const c = 0-2*A_1*E_1*E_2-2*C_1*D_1*D_2-A_2*E_1**2-C_2*D_1**2+A_1*C_1*F_2+A_1*C_2*F_1+A_2*C_1*F_1
+  const d = -A_1*E_1**2-C_1*D_1**2+A_1*C_1*F_1
+  const var2 = {
+    a0: a.toString(),
+    a1: b.toString(),
+    a2: c.toString(),
+    a3: d.toString(),
+  }
+
+  console.log(var2)
+  const startTime = performance.now()
+
+  const p = (3*a*c - b**2)/(3*a**2)
+  const q = (2*b**3 - 9*a*b*c + 27*a**2*d)/(27*a**3)
+
+  let det = q**2/4 + p**3/27
+
+  if (det < 0) {
+    console.log('bruh', det)
+  }
+  det = 0
+  const t = Math.cbrt(-q/2 + Math.sqrt(det)) + Math.cbrt(-q/2 - Math.sqrt(det)) - b/(3*a)
+  
+  const A = A_1 + t * A_2
+  const C = D_1 + t * D_2
+  const E = C_1 + t * C_2
+  const F = E_1 + t * E_2
+  const I = F_1 + t * F_2
+
+  const matrix = new Matrix([
+    [A, 0, C],
+    [0, E, F],
+    [C, F, I]
+  ])
+  console.log(t)
+  console.log(matrix)
+  console.log(matrix.toReducedRowEchelonForm())
+
+  console.log(nerdamer('(-A_2*E_2^2-C_2*D_2^2+A_2*C_2*F_2)*t^3+(-2*A_2*E_1*E_2-2*C_2*D_1*D_2-A_1*E_2^2-C_1*D_2^2+A_1*C_2*F_2+A_2*C_1*F_2+A_2*C_2*F_1)*t^2+(0-2*A_1*E_1*E_2-2*C_1*D_1*D_2-A_2*E_1^2-C_2*D_1^2+A_1*C_1*F_2+A_1*C_2*F_1+A_2*C_1*F_1)*t+(-A_1*E_1^2-C_1*D_1^2+A_1*C_1*F_1) = 0', variables).solveFor('t').toString())
+  console.log(performance.now() - startTime)
+}
+
+export function createGraphObject(expression: Expression) {
+  const graphType = getGraphType(expression);
+  const Class = GraphTypes[graphType];
+  if (Class) {
+    return new Class(expression);
+  }
+  throw Error('Tried to convert non-conic to a conic');
 }

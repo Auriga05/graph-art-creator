@@ -1,0 +1,26 @@
+<div id="artist" style="position: absolute; bottom: 5%; right: 5%; padding: 10px; border: 1px solid black; border-radius: 10px">
+  <form id="colorForm" onSubmit="return changeColor()">
+    <div> Color 
+      <input name="color" type="color">
+    </div>
+    <div> Opacity 
+      <input name="fillOpacity" type="number" min="0" max="1" value="0.4">
+    </div>
+    <div>
+      <input type="button" value="Apply" onclick="changeColor()">
+  </div>
+  </form>
+</div>
+
+<script>
+  function changeColor() {
+    const array = [...new FormData(document.querySelector("#colorForm")).entries()]
+    const data = {}
+    array.forEach((pair) => {
+      const [key, value] = pair
+      data[key] = value
+    })
+    console.log(data)
+    return false
+  }
+</script>

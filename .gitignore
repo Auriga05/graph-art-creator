@@ -1,12 +1,1 @@
 node_modules
-.eslintignore
-.eslintrc.yml
-index_old.js
-package-lock.json
-package.json
-test.html
-tsconfig.json
-index.user.ts
-evaluatex.js
-index-experimental.user.js
-index-hotfix.user.js
