@@ -1,13 +1,29 @@
+import { GeneralConicVariables, Bounds, NumberBounds } from './../types';
 import { Conic } from "../classes/Conic";
 import { Graph } from "../classes/Graph";
 import { defaultExpressionFormat, xExpressions, yExpressions } from "../constants";
 import { MyCalc } from "../index.user";
-import { Expression, getVariable, LinkedVariable, getDomains, substitute, simplify, setVariable } from "../lib";
+import { getVariable, LinkedVariable, getDomains, substitute, simplify, setVariable } from "../lib";
+import { Expression, InputBaseExpression } from "../types";
 
+export type HorizontalHyperbolaVariables = {
+  h: number,
+  k: number,
+  a: number,
+  b: number,
+}
+
+export type HorizontalHyperbolaData = {
+  graphType: 4
+  variables: HorizontalHyperbolaVariables | {[Property in keyof HorizontalHyperbolaVariables]: LinkedVariable}
+  bounds: Bounds
+}
 export class HorizontalHyperbola extends Graph implements Initializable, Conic {
   static hasCenter = true;
   static hasCrop = true;
-  isConic = true;
+  static graphType = 4;
+  static isConic = true;
+  static hasGeneralForm = true;
   static expressionFormat = [ // Horizontal Hyperbola (x)
     { latex: '\\frac{\\left(x-h_{1}\\right)^{2}}{a_{1}^{2}}-\\frac{\\left(y-k_{1}\\right)^{2}}{b_{1}^{2}}=1', types: ['graph'] },
     { latex: '\\left(h_{1},k_{1}\\right)', types: ['point', 'hide'] },
@@ -21,8 +37,18 @@ export class HorizontalHyperbola extends Graph implements Initializable, Conic {
     ...yExpressions[4].map((yExpression, c) => ({ latex: `f_{1y${String.fromCharCode(97 + c)}}(x)=${yExpression}`, types: ['y_expression'], name: `f_{1y${String.fromCharCode(97 + c)}}` })),
     ...xExpressions[4].map((xExpression, c) => ({ latex: `f_{1x${String.fromCharCode(97 + c)}}(y)=${xExpression}`, types: ['x_expression'], name: `f_{1x${String.fromCharCode(97 + c)}}` })),
   ]
-  constructor(expression: Expression) {
+  constructor(expression: InputBaseExpression) {
     super(expression, 4);
+  }
+
+  static fromGeneral(variable: GeneralConicVariables) {
+    const {A, C, D, E, F} = variable
+    const h = -D / (2 * A)
+    const k = -E / (2 * C)
+    const a = Math.sqrt((A * h ** 2 + C * k ** 2 - F)/A)
+    const b = Math.sqrt(-(A * h ** 2 + C * k ** 2 - F)/C)
+
+    return { h, k, a, b };
   }
 
   getGeneralForm() {
@@ -36,7 +62,7 @@ export class HorizontalHyperbola extends Graph implements Initializable, Conic {
     const D = -2 * h * b ** 2;
     const E = 2 * k * a ** 2;
     const F = b ** 2 * h ** 2 - a ** 2 * k ** 2 - a ** 2 * b ** 2;
-    return { A, C, D, E, F };
+    return { A, B:0, C, D, E, F };
   }
 
   getConicVariables() {
@@ -46,6 +72,10 @@ export class HorizontalHyperbola extends Graph implements Initializable, Conic {
     const a = MyCalc.linkedVariable(`a_{${graphId}}`);
     const b = MyCalc.linkedVariable(`b_{${graphId}}`);
     return { h, k, a, b };
+  }
+
+  getGraphVariables() {
+    return this.getConicVariables()
   }
 
   convertToStandard() {
@@ -71,8 +101,8 @@ export class HorizontalHyperbola extends Graph implements Initializable, Conic {
     const { h, k, a, b } = variables;
 
     points = [
-      { x: MyCalc.linkedVariable(`${h.reference}-${a.reference}`), y: k },
-      { x: MyCalc.linkedVariable(`${h.reference}+${a.reference}`), y: k },
+      { x: MyCalc.linkedVariable(`${h.reference}-${a.reference}`, h.value - a.value), y: k },
+      { x: MyCalc.linkedVariable(`${h.reference}+${a.reference}`, h.value + a.value), y: k },
     ];
 
     return {
@@ -110,7 +140,7 @@ export class HorizontalHyperbola extends Graph implements Initializable, Conic {
     return {h, k, a, b}
   }
 
-  static setGraphVariables(variables: ReturnType<typeof HorizontalHyperbola.transformVariables>, graphId: number) {
+  static setGraphVariables(variables: HorizontalHyperbolaVariables | {[Property in keyof HorizontalHyperbolaVariables]: LinkedVariable}, graphId: number) {
     const { h, k, a, b } = variables;
     setVariable(`h_{${graphId}}`, h);
     setVariable(`k_{${graphId}}`, k);

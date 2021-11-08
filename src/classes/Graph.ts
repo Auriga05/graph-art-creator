@@ -1,11 +1,12 @@
 import { xExpressions, xExpressionsEval, yExpressions, yExpressionsEval } from '../constants'
 import { Circle, CircleVariables } from '../graphs/Circle'
 import { MyCalc } from '../index.user'
-import { Expression, LinkedVariable, getGraphType, Bounds, Evaluations, getVariable, getDomains, hasXDomain, maxLinkedVariable, minLinkedVariable, hasYDomain, EvaluatexType, LinkedCoordinate } from '../lib'
+import {LinkedVariable, getGraphType, getVariable, getDomains, hasXDomain, maxLinkedVariable, minLinkedVariable, hasYDomain, EvaluatexType, getIdParts } from '../lib'
+import { Expression, LinkedCoordinate, InputBaseExpression, Bounds, Evaluations, BaseExpression } from '../types'
 
 declare const evaluatex: EvaluatexType
 
-export abstract class Graph implements Expression {
+export abstract class Graph implements InputBaseExpression {
   color: string
 
   hidden: boolean
@@ -14,11 +15,13 @@ export abstract class Graph implements Expression {
 
   latex: string
 
-  type: string
+  type: "expression"
 
   graphId: number
 
   graphType: number
+
+  label: string
 
   abstract getRelevant(axis: string): number[]
 
@@ -27,13 +30,22 @@ export abstract class Graph implements Expression {
     cropPoints: LinkedCoordinate[]
   }
 
-  constructor(expression: Expression, graphType?: number) {
+  abstract getGraphVariables(): {[key: string]: LinkedVariable}
+
+  constructor(expression: InputBaseExpression, graphType?: number) {
     this.color = expression.color;
     this.hidden = expression.hidden;
     this.id = expression.id;
     this.latex = expression.latex;
     this.type = expression.type;
-    this.graphId = parseInt(this.id.split('_')[0], 10);
+    const id = getIdParts(this.id)
+    this.graphId = -1
+    if (id.isEditable || id.isFinal) {
+      this.graphId = id.graphId
+    } else {
+      throw Error("Tried to create Graph Object from a non-curve expression")
+    }
+    this.label = expression.label ? expression.label : ""
     if (graphType) {
       this.graphType = graphType;
     } else {
@@ -115,15 +127,21 @@ export abstract class Graph implements Expression {
       yMax: yMaxDomain,
     } = getDomains(this.graphId);
 
-    xMin = parseFloat(xMinDomain.value.toFixed(4)) < parseFloat(xMin.value.toFixed(4)) ? xMin : xMinDomain
-    xMax = parseFloat(xMaxDomain.value.toFixed(4)) > parseFloat(xMax.value.toFixed(4)) ? xMax : xMaxDomain;
-    yMin = parseFloat(yMinDomain.value.toFixed(4)) < parseFloat(yMin.value.toFixed(4)) ? yMin : yMinDomain;
-    yMax = parseFloat(yMaxDomain.value.toFixed(4)) > parseFloat(yMax.value.toFixed(4)) ? yMax : yMaxDomain;
+    xMin = parseFloat(xMinDomain.value.toFixed(MyCalc.precision)) < parseFloat(xMin.value.toFixed(MyCalc.precision)) ? xMin : xMinDomain;
+    xMax = parseFloat(xMaxDomain.value.toFixed(MyCalc.precision)) > parseFloat(xMax.value.toFixed(MyCalc.precision)) ? xMax : xMaxDomain;
+    yMin = parseFloat(yMinDomain.value.toFixed(MyCalc.precision)) < parseFloat(yMin.value.toFixed(MyCalc.precision)) ? yMin : yMinDomain;
+    yMax = parseFloat(yMaxDomain.value.toFixed(MyCalc.precision)) > parseFloat(yMax.value.toFixed(MyCalc.precision)) ? yMax : yMaxDomain;
 
     xMin = hasXDomain(cropType) ? xMin : MyCalc.linkedVariable(-Infinity);
     xMax = hasXDomain(cropType) ? xMax : MyCalc.linkedVariable(Infinity);
     yMin = hasYDomain(cropType) ? yMin : MyCalc.linkedVariable(-Infinity);
     yMax = hasYDomain(cropType) ? yMax : MyCalc.linkedVariable(Infinity);
+
+    xMin.value -= 10 ** (-MyCalc.precision)
+    xMax.value += 10 ** (-MyCalc.precision)
+    yMin.value -= 10 ** (-MyCalc.precision)
+    yMax.value += 10 ** (-MyCalc.precision)
+
     return { xMin, yMin, xMax, yMax };
   }
 
@@ -180,7 +198,7 @@ export abstract class Graph implements Expression {
     const { graphId } = this;
     let { xMin, yMin, xMax, yMax } = getDomains(graphId);
     let [newXMin, newXMax, newYMin, newYMax] = [
-      MyCalc.linkedVariable(null, -Infinity), MyCalc.linkedVariable(null, Infinity), MyCalc.linkedVariable(null, -Infinity), MyCalc.linkedVariable(null, Infinity),
+      MyCalc.linkedVariable(-Infinity), MyCalc.linkedVariable(Infinity), MyCalc.linkedVariable(-Infinity), MyCalc.linkedVariable(Infinity),
     ];
     const { specialPoints, cropPoints } = this.getEndpoints();
     const points = [...specialPoints, ...cropPoints];

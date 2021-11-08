@@ -1,3 +1,4 @@
+import { IdParts, GraphingOptions, Bounds, EditableIdParts } from './types';
 // ==UserScript==
 // @name         Precal thing
 // @namespace    http://tampermonkey.net/
@@ -13,10 +14,13 @@
 // @require      https://cdn.jsdelivr.net/npm/evaluatex@2.2.0/dist/evaluatex.min.js
 // ==/UserScript==
 
-import { LinkedVariable, Expression, getGraphType, parseDomains, simplify, generateBounds, substituteParenthesis, substituteFromId, usesVariable, functionRegex, setVariable, Bounds, NumberBounds, GraphTypes, createGraphObject, doesIntersect, typeFilter, createConic, createBezier, toId} from './lib'
+import { LinkedVariable, getGraphType, parseDomains, simplify, generateBounds, substituteParenthesis, substituteFromId, setVariable, GraphTypes, createGraphObject, doesIntersect, typeFilter, createConic, createBezier, toId, transformBezier, getDomainsFromLatex, isBaseExpression, createLineSegment, getIdParts, functionRegex} from './lib'
 import { Graph } from './classes/Graph'
-import { CalcType, MyCalcClass } from './MyCalc';
-import { getCriticalPoints } from './bezierLib';
+import { MyCalcClass } from './MyCalc';
+import { BaseExpression, Expression, InputBaseExpression, MinBaseExpression, NumberBounds } from './types';
+import { CalcType } from './desmosTypes';
+import { finalize, finalizeId, unfinalize } from './actions/finalize';
+import { hideCropLines } from './actions/hideCropLines';
 
 interface SelectionObject {
   id: string
@@ -45,22 +49,218 @@ function isGraph(expression: Expression) {
 
 export let MyCalc: MyCalcClass;
 
+export function createGraphWithBounds(graphId: number, graphType: number, variables: any, _bounds: NumberBounds | Bounds, options?: GraphingOptions) {
+  const logical = !!options?.logical
+  let xMin = _bounds.xMin instanceof LinkedVariable ? _bounds.xMin.value : _bounds.xMin
+  let yMin = _bounds.yMin instanceof LinkedVariable ? _bounds.yMin.value : _bounds.yMin
+  let xMax = _bounds.xMax instanceof LinkedVariable ? _bounds.xMax.value : _bounds.xMax
+  let yMax = _bounds.yMax instanceof LinkedVariable ? _bounds.yMax.value : _bounds.yMax
+  let cropType = 0;
+  // 0 - default (x and y), 1 - x only, 2 - y only, 3 - no crop
+  if (!Number.isFinite(xMin) && !Number.isFinite(xMax)) { // Has no x domain
+    cropType += 2;
+  }
+  if (!Number.isFinite(yMin) && !Number.isFinite(yMax)) { // Has no y domain
+    cropType += 1;
+  }
+  let h = 0;
+  let k = 0;
+
+  const graphFormat = GraphTypes[graphType].expressionFormat;
+  const expressionsToSet = [];
+
+  GraphTypes[graphType].setGraphVariables(variables, graphId)
+  if (GraphTypes[graphType].hasCenter) {
+    ({h, k} = variables);
+    setVariable(`x_{${graphId}cam}`, (xMin - h).toString());
+    setVariable(`y_{${graphId}cam}`, (yMin - k).toString());
+    setVariable(`x_{${graphId}cbm}`, (xMax - h).toString());
+    setVariable(`y_{${graphId}cbm}`, (yMax - k).toString());
+    setVariable(`x_{${graphId}ca}`, xMin.toString());
+    setVariable(`y_{${graphId}ca}`, yMin.toString());
+    setVariable(`x_{${graphId}cb}`, xMax.toString());
+    setVariable(`y_{${graphId}cb}`, yMax.toString());
+  }
+  if (logical || options?.finalize) {
+    const newExpression = graphFormat[0]
+    let newExpressionLatex = newExpression.latex;
+    newExpressionLatex = newExpressionLatex.replaceAll('_{1', `_{${graphId}`);
+    if (GraphTypes[graphType].hasCenter) {
+      newExpressionLatex += generateBounds(
+        MyCalc.linkedVariable(`x_{${graphId}ca}`, xMin),
+        MyCalc.linkedVariable(`y_{${graphId}ca}`, yMin),
+        MyCalc.linkedVariable(`x_{${graphId}cb}`, xMax),
+        MyCalc.linkedVariable(`y_{${graphId}cb}`, yMax)
+      ).reference;
+    }
+    const graphObject = createGraphObject({
+      id: `${graphId.toString()}_${0}`,
+      latex: newExpressionLatex,
+      color: 'BLACK', 
+      hidden: false,
+      type: "expression",
+      label: JSON.stringify({
+        graphType
+      })
+    })
+    graphFormat
+      .map((expression, index) => { return {index, ...expression}})
+      .filter(expression => doesIntersect(expression.types, ['x_expression', 'y_expression']))
+      .forEach(_expression => {
+        const expression = _expression.latex.replaceAll('_{1', `_{${graphId}`);
+        const split = expression.split('=');
+        const matches = [...split[0].matchAll(functionRegex)]
+        if (matches.length > 0) {
+          const [full, name, args] = matches[0];
+          MyCalc.globalFunctionsObject[name] = {
+            id: `${graphId}_${_expression.index}`,
+            args: args.split(','),
+            definition: split[1],
+          }
+        }
+      })
+    if (GraphTypes[graphType].hasCrop) {
+      const bounds = graphObject.getRealBounds();
+      if (!Number.isFinite(xMin)) {
+        xMin = bounds.xMin.value - 2;
+      }
+      if (!Number.isFinite(yMin)) {
+        yMin = bounds.yMin.value - 2;
+      }
+      if (!Number.isFinite(xMax)) {
+        xMax = bounds.xMax.value + 2;
+      }
+      if (!Number.isFinite(yMax)) {
+        yMax = bounds.yMax.value + 2;
+      }
+      setVariable(`x_{${graphId}cam}`, (xMin - h).toString());
+      setVariable(`y_{${graphId}cam}`, (yMin - k).toString());
+      setVariable(`x_{${graphId}cbm}`, (xMax - h).toString());
+      setVariable(`y_{${graphId}cbm}`, (yMax - k).toString());
+      setVariable(`x_{${graphId}ca}`, xMin.toString());
+      setVariable(`y_{${graphId}ca}`, yMin.toString());
+      setVariable(`x_{${graphId}cb}`, xMax.toString());
+      setVariable(`y_{${graphId}cb}`, yMax.toString());
+    }
+    if (options?.finalize) {
+      graphObject.latex = graphObject.convertToStandard();
+      graphObject.id = `final_${graphObject.graphId}`
+      MyCalc.setExpression(graphObject);
+    } else {
+      MyCalc.setLogicalExpression(graphObject);
+    }
+  } else {
+    for (let i = 0; i < graphFormat.length; i++) {
+      const newExpression = graphFormat[i];
+      let newExpressionLatex = newExpression.latex;
+      newExpressionLatex = newExpressionLatex.replaceAll('_{1', `_{${graphId}`);
+      if (doesIntersect(newExpression.types, ['var'])) {
+        const [variable] = newExpressionLatex.split('=');
+        const value = MyCalc.globalVariablesObject[toId(variable, graphId)];
+        newExpressionLatex = `${variable}=${simplify(parseFloat(value), 4)}`;
+      }
+      let label = ""
+      if (graphType !== 6) {
+        if (i === 0) {
+          label = JSON.stringify({
+            graphType
+          })
+          newExpressionLatex += generateBounds(
+            MyCalc.linkedVariable(`x_{${graphId}ca}`, xMin),
+            MyCalc.linkedVariable(`y_{${graphId}ca}`, yMin),
+            MyCalc.linkedVariable(`x_{${graphId}cb}`, xMax),
+            MyCalc.linkedVariable(`y_{${graphId}cb}`, yMax)
+          ).reference;
+          const conic = createGraphObject({
+            id: `${graphId.toString()}_${i}`,
+            latex: newExpressionLatex, color: 'BLACK',
+            hidden: doesIntersect(graphFormat[i].types, ['x_expression', 'y_expression']),
+            type: "expression",
+            label: JSON.stringify({
+              graphType
+            })
+          });
+          const bounds = conic.getRealBounds();
+          if (!Number.isFinite(xMin)) {
+            xMin = bounds.xMin.value - 2;
+          }
+          if (!Number.isFinite(yMin)) {
+            yMin = bounds.yMin.value - 2;
+          }
+          if (!Number.isFinite(xMax)) {
+            xMax = bounds.xMax.value + 2;
+          }
+          if (!Number.isFinite(yMax)) {
+            yMax = bounds.yMax.value + 2;
+          }
+          setVariable(`x_{${graphId}cam}`, (xMin - h).toString());
+          setVariable(`y_{${graphId}cam}`, (yMin - k).toString());
+          setVariable(`x_{${graphId}cbm}`, (xMax - h).toString());
+          setVariable(`y_{${graphId}cbm}`, (yMax - k).toString());
+          setVariable(`x_{${graphId}ca}`, xMin.toString());
+          setVariable(`y_{${graphId}ca}`, yMin.toString());
+          setVariable(`x_{${graphId}cb}`, xMax.toString());
+          setVariable(`y_{${graphId}cb}`, yMax.toString());
+        }
+      }
+      let isHidden;
+      if (options?.hideCropLines) {
+        isHidden = doesIntersect(graphFormat[i].types, ['x_expression', 'y_expression', 'x', 'y', 'xy']);
+      } else {
+        isHidden = doesIntersect(graphFormat[i].types, ['x_expression', 'y_expression']);
+        if (doesIntersect(graphFormat[i].types, ['x'])) isHidden = (cropType % 2 === 1);
+        if (doesIntersect(graphFormat[i].types, ['y'])) isHidden = cropType > 1;
+        if (doesIntersect(graphFormat[i].types, ['xy'])) isHidden = cropType === 3;        
+      }
+      if (options?.hideAll) {
+        isHidden = doesIntersect(graphFormat[i].types, ['x_expression', 'y_expression', 'x', 'y', 'xy', 'point']);
+      }
+      
+      if (doesIntersect(graphFormat[i].types, ['x_expression', 'y_expression'])) {
+        const split = newExpressionLatex.split('=');
+        const matches = [...split[0].matchAll(functionRegex)]
+        if (matches.length > 0) {
+          const [full, name, args] = matches[0];
+          MyCalc.globalFunctionsObject[name] = {
+            id: `${graphId}_${i}`,
+            args: args.split(','),
+            definition: split[1],
+          }
+        }
+      }
+      const newBaseExpression: InputBaseExpression = {
+        id: `${graphId}_${i}`,
+        latex: newExpressionLatex,
+        color: 'BLACK',
+        hidden: isHidden,
+        type: "expression",
+        label: label
+      }
+      expressionsToSet.push(newBaseExpression);
+    }
+    if (options?.update) {
+      MyCalc.updateExpressions(expressionsToSet)
+    } else if (options?.set) {
+      MyCalc.setExpressions(expressionsToSet)
+    } else {
+      MyCalc.newGraph(graphId, expressionsToSet);
+    }
+  }
+}
+
 function main() {
   MyCalc = new MyCalcClass(Calc);
 
   const selections: SelectionObject[] = [];
   let easySelections: {x: number, y: number}[] = [];
-  let lastSelection: {x: number, y: number};
   const graphAbbrev = ['C', 'HP', 'VP', 'E', 'HH', 'VH', 'LS'];
   let easyMode = false;
   let lastSelectedId = '';
   let currentlyPressed: number[] = [];
-  let idSet = false;
   let shadeIdSet = false;
   let altTime = 0;
   let ctrlTime = 0;
   let expressionPos = { x: 0, y: 0 };
-  let globalId = 1;
   let shadeId = 1;
   let currGraphId = 0;
   let centerPoint = {
@@ -85,328 +285,34 @@ function main() {
     [key: string]: { x: LinkedVariable, y: LinkedVariable }
   } = {
     lastUpperBoundary: {
-      x: MyCalc.linkedVariable(null, -Infinity),
-      y: MyCalc.linkedVariable(null, -Infinity),
+      x: MyCalc.linkedVariable(-Infinity),
+      y: MyCalc.linkedVariable(-Infinity),
     },
     lastLowerBoundary: {
-      x: MyCalc.linkedVariable(null, Infinity),
-      y: MyCalc.linkedVariable(null, Infinity),
+      x: MyCalc.linkedVariable(Infinity),
+      y: MyCalc.linkedVariable(Infinity),
     },
   };
 
-  function updateVariables(filter ? : string) {
-    Object.keys(MyCalc.globalVariablesObject).forEach(key => {
-      delete MyCalc.globalVariablesObject[key];
-    })
-    let currExpressions = MyCalc.getExpressions();
-    if (filter) {
-      const idFilter = `${filter}_`;
-      currExpressions = currExpressions.filter((x) => x.id.startsWith(idFilter));
-    }
-    for (let i = 0; i < currExpressions.length; i++) {
-      const expression = currExpressions[i];
-      const analysis = MyCalc.expressionAnalysis[expression.id];
-      if (analysis) {
-        if (analysis.evaluation) {
-          if (analysis.evaluation.type === 'Number') {
-            const variable = expression.latex.split('=')[0];
-            if (variable.includes('_') && !(['x', 'y'].includes(variable))) {
-              MyCalc.globalVariablesObject[variable] = analysis.evaluation.value.toString();
-            }
-          }
-        } else if (expression.latex) {
-          if (expression.latex.includes('f_')) {
-            // console.log(expression);
-          }
-        }
-      }
-    }
-  }
-
-  function getDomainsFromLatex(latex: string) {
-    return [
-      ...latex.matchAll(/\\left\\{((?:[-+]?\d+\.?\d*<)?[xy](?:<[-+]?\d+\.?\d*)?)\\right\\}/g),
-    ].map((domain) => domain[1]);
-  }
-
-  function transformVariables(graphType: number, variables: number[]) {
-    return GraphTypes[graphType].transformVariables(variables)
-  }
-
-  function createGraphWithBounds(graphId: number, graphType: number, variables: any, _bounds: NumberBounds, _logical?: boolean) {
-    const logical = !!_logical
-    let { xMin, yMin, xMax, yMax } = _bounds;
-    let cropType = 0;
-    // 0 - default (x and y), 1 - x only, 2 - y only, 3 - no crop
-    if (!Number.isFinite(xMin) && !Number.isFinite(xMax)) { // Has no x domain
-      cropType += 2;
-    }
-    if (!Number.isFinite(yMin) && !Number.isFinite(yMax)) { // Has no y domain
-      cropType += 1;
-    }
-    let h = 0;
-    let k = 0;
-
-    const expression = GraphTypes[graphType].expressionFormat;
-    const expressionsToSet = [];
-
-    GraphTypes[graphType].setGraphVariables(variables, graphId)
-    if (GraphTypes[graphType].hasCenter) {
-      ({h, k} = variables);
-      setVariable(`x_{${graphId}cam}`, (xMin - h).toString());
-      setVariable(`y_{${graphId}cam}`, (yMin - k).toString());
-      setVariable(`x_{${graphId}cbm}`, (xMax - h).toString());
-      setVariable(`y_{${graphId}cbm}`, (yMax - k).toString());
-      setVariable(`x_{${graphId}ca}`, xMin.toString());
-      setVariable(`y_{${graphId}ca}`, yMin.toString());
-      setVariable(`x_{${graphId}cb}`, xMax.toString());
-      setVariable(`y_{${graphId}cb}`, yMax.toString());
-    }
-    if (logical) {
-      const newExpression = expression[0]
-      let newExpressionLatex = newExpression.latex;
-      newExpressionLatex = newExpressionLatex.replaceAll('_{1', `_{${graphId}`);
-      if (GraphTypes[graphType].hasCenter) {
-        newExpressionLatex += generateBounds(MyCalc.linkedVariable(`x_{${graphId}ca}`, xMin), MyCalc.linkedVariable(`y_{${graphId}ca}`, yMin), MyCalc.linkedVariable(`x_{${graphId}cb}`, xMax), MyCalc.linkedVariable(`y_{${graphId}cb}`, yMax))
-          .reference;
-        const conic = createGraphObject({
-          id: `${graphId.toString()}_${0}`,
-          latex: newExpressionLatex,
-          color: 'BLACK', 
-          hidden: false,
-          type: 'expression'
-        })
-        const bounds = conic.getRealBounds();
-        if (!Number.isFinite(xMin)) {
-          xMin = bounds.xMin.value - 2;
-        }
-        if (!Number.isFinite(yMin)) {
-          yMin = bounds.yMin.value - 2;
-        }
-        if (!Number.isFinite(xMax)) {
-          xMax = bounds.xMax.value + 2;
-        }
-        if (!Number.isFinite(yMax)) {
-          yMax = bounds.yMax.value + 2;
-        }
-        setVariable(`x_{${graphId}cam}`, (xMin - h).toString());
-        setVariable(`y_{${graphId}cam}`, (yMin - k).toString());
-        setVariable(`x_{${graphId}cbm}`, (xMax - h).toString());
-        setVariable(`y_{${graphId}cbm}`, (yMax - k).toString());
-        setVariable(`x_{${graphId}ca}`, xMin.toString());
-        setVariable(`y_{${graphId}ca}`, yMin.toString());
-        setVariable(`x_{${graphId}cb}`, xMax.toString());
-        setVariable(`y_{${graphId}cb}`, yMax.toString());
-        MyCalc.setLogicalExpression({
-          id: `${graphId.toString()}_${0}`,
-          latex: newExpressionLatex,
-          color: 'BLACK',
-          hidden: false,
-          type: 'expression',
-        });
-      }
-    } else {
-      for (let i = 0; i < expression.length; i++) {
-        const newExpression = expression[i];
-        let newExpressionLatex = newExpression.latex;
-        newExpressionLatex = newExpressionLatex.replaceAll('_{1', `_{${graphId}`);
-        if (doesIntersect(newExpression.types, ['var'])) {
-          const [variable] = newExpressionLatex.split('=');
-          const value = MyCalc.globalVariablesObject[toId(variable, graphId)];
-          newExpressionLatex = `${variable}=${simplify(parseFloat(value), 4)}`;
-        }
-        if (graphType !== 6) {
-          if (i === 0) {
-            newExpressionLatex += generateBounds(MyCalc.linkedVariable(`x_{${graphId}ca}`, xMin), MyCalc.linkedVariable(`y_{${graphId}ca}`, yMin), MyCalc.linkedVariable(`x_{${graphId}cb}`, xMax), MyCalc.linkedVariable(`y_{${graphId}cb}`, yMax))
-              .reference;
-            const conic = createGraphObject({ id: `${graphId.toString()}_${i}`, latex: newExpressionLatex, color: 'BLACK', hidden: doesIntersect(expression[i].types, ['x_expression', 'y_expression']), type: 'expression' });
-            const bounds = conic.getRealBounds();
-            if (!Number.isFinite(xMin)) {
-              xMin = bounds.xMin.value - 2;
-            }
-            if (!Number.isFinite(yMin)) {
-              yMin = bounds.yMin.value - 2;
-            }
-            if (!Number.isFinite(xMax)) {
-              xMax = bounds.xMax.value + 2;
-            }
-            if (!Number.isFinite(yMax)) {
-              yMax = bounds.yMax.value + 2;
-            }
-            setVariable(`x_{${graphId}cam}`, (xMin - h).toString());
-            setVariable(`y_{${graphId}cam}`, (yMin - k).toString());
-            setVariable(`x_{${graphId}cbm}`, (xMax - h).toString());
-            setVariable(`y_{${graphId}cbm}`, (yMax - k).toString());
-            setVariable(`x_{${graphId}ca}`, xMin.toString());
-            setVariable(`y_{${graphId}ca}`, yMin.toString());
-            setVariable(`x_{${graphId}cb}`, xMax.toString());
-            setVariable(`y_{${graphId}cb}`, yMax.toString());
-          }
-        }
-        let isHidden = doesIntersect(expression[i].types, ['x_expression', 'y_expression']);
-        if (doesIntersect(expression[i].types, ['x'])) isHidden = (cropType % 2 === 1);
-        if (doesIntersect(expression[i].types, ['y'])) isHidden = cropType > 1;
-        if (doesIntersect(expression[i].types, ['xy'])) isHidden = cropType === 3;
-        expressionsToSet.push({
-          id: `${graphId.toString()}_${i}`,
-          latex: newExpressionLatex,
-          color: 'BLACK',
-          hidden: isHidden,
-          type: 'expression',
-        });
-      }
-      MyCalc.setExpressions(expressionsToSet);
-    }
-  }
-
-  function convertFromStandard(latex: string, _id: string, _logical?: boolean) {
-    const logical = !!_logical;
-    const graphId = parseInt(_id, 10);
-    const regex = [
-      /\\left\(x([-+]?\d+\.?\d*)\\right\)\^\{2\}\+\\left\(y([-+]?\d+\.?\d*)\\right\)\^\{2\}=([-+]?\d+\.?\d*)/g,
-      /\\left\(y([-+]?\d+\.?\d*)\\right\)\^\{2\}=([-+]?\d+\.?\d*)\\left\(x([-+]?\d+\.?\d*)\\right\)/g,
-      /\\left\(x([-+]?\d+\.?\d*)\\right\)\^\{2\}=([-+]?\d+\.?\d*)\\left\(y([-+]?\d+\.?\d*)\\right\)/g,
-      /\\frac\{\\left\(x([-+]?\d+\.?\d*)\\right\)\^\{2\}\}\{([-+]?\d+\.?\d*)\}\+\\frac\{\\left\(y([-+]?\d+\.?\d*)\\right\)\^\{2\}\}\{([-+]?\d+\.?\d*)\}=1/g,
-      /\\frac\{\\left\(x([-+]?\d+\.?\d*)\\right\)\^\{2\}\}\{([-+]?\d+\.?\d*)\}-\\frac\{\\left\(y([-+]?\d+\.?\d*)\\right\)\^\{2\}\}\{([-+]?\d+\.?\d*)\}=1/g,
-      /\\frac\{\\left\(y([-+]?\d+\.?\d*)\\right\)\^\{2\}\}\{([-+]?\d+\.?\d*)\}-\\frac\{\\left\(x([-+]?\d+\.?\d*)\\right\)\^\{2\}\}\{([-+]?\d+\.?\d*)\}=1/g,
-      /y=([-+]?\d+\.?\d*)x([-+]?\d+\.?\d*)\\left\\{([-+]?\d+\.?\d*)<x<([-+]?\d+\.?\d*)\\right\\}/g,
-    ];
-    const graphType = regex.findIndex((pattern) => pattern.test(latex));
-    if (graphType === -1) {
-    } else {
-      const currRegex = regex[graphType];
-      const match = latex.match(currRegex);
-      if (match) {
-        const variables = [...match[0].matchAll(currRegex)][0].slice(1)
-          .map((x) => parseFloat(x));
-        const domains = getDomainsFromLatex(latex);
-        if (domains) {
-          const bounds = parseDomains(domains);
-          createGraphWithBounds(graphId, graphType, transformVariables(graphType, variables), bounds, logical);
-        }
-      }
-    }
-  }
-
-  function unfinalizeConvert(expressionId: string) {
-    const regex = /y=([-+]?(?:\d+\.?\d*)?)\\sqrt\{([-+]?\d+\.?\d*)\+\\left\(x([-+]?\d+\.?\d*)\\right\)\^\{2\}\}([-+]?\d+\.?\d*)/g;
-    const expression = MyCalc.getExpression(expressionId);
-    if (expression) {
-      const variables = [...expression.latex.matchAll(regex)][0].slice(1);
-      if (variables.length) {
-        const [_a, _b, _h, _k] = variables;
-        const a = parseFloat(_a === '-' ? '-1' : _a);
-        const b = parseFloat(_b);
-        const h = -parseFloat(_h);
-        const k = parseFloat(_k);
-        const a2 = b * a ** 2;
-        const b2 = b;
-        const { xMin: _xMin, xMax: _xMax, yMin: _yMin, yMax: _yMax } = parseDomains(getDomainsFromLatex(expression.latex));
-        const xMin = Math.max(-Infinity, _xMin);
-        const xMax = Math.min(Infinity, _xMax);
-        if (a < 0) { // down
-          const yMin = Math.max(-Infinity, _yMin);
-          const yMax = Math.min(k, _yMax);
-          if (b < 0) { // horizontal hyperbola
-            createGraphWithBounds(globalId, 4, { h, a: Math.sqrt(Math.abs(b2)), k, b: Math.sqrt(Math.abs(a2)) }, { xMin, xMax, yMin, yMax });
-          } else if (b > 0) { // vertical hyperbola
-            createGraphWithBounds(globalId, 5, { h, a: Math.sqrt(Math.abs(a2)), k, b: Math.sqrt(Math.abs(b2)) }, { xMin, xMax, yMin, yMax });
-          }
-        } else if (a > 0) { // up
-          const yMin = Math.max(k, _yMin);
-          const yMax = Math.min(Infinity, _yMax);
-          if (b < 0) { // horizontal hyperbola
-            createGraphWithBounds(globalId, 4, { h, a: Math.sqrt(Math.abs(b2)), k, b: Math.sqrt(Math.abs(a2)) }, { xMin, xMax, yMin, yMax });
-          } else if (b > 0) { // vertical parabola
-            createGraphWithBounds(globalId, 5, { h, a: Math.sqrt(Math.abs(a2)), k, b: Math.sqrt(Math.abs(b2)) }, { xMin, xMax, yMin, yMax });
-          }
-        }
-      }
-    }
-  }
-
-  function unfinalize(expressionId: string, _logical?: boolean) {
-    const logical = !!_logical;
-    const currId = expressionId.split('_')[1];
-    const baseExpression = MyCalc.getExpression(expressionId);
-    if (baseExpression) {
-      convertFromStandard(baseExpression.latex, currId, logical);
-      if (!logical) {
-        MyCalc.removeExpressions([baseExpression]);
-      }
-    }
-  }
-
-  function finalize(expressionId: string) {
-    if (MyCalc.isLogical(expressionId)) {
-      const graphId = parseInt(expressionId.split("_")[0])
-      const expressionList = MyCalc.dependsOn(graphId).map((_expression) => {
-        const expression = _expression
-        expression.latex = substituteFromId(expression.latex, graphId)
-        return expression
-      })
-      MyCalc.updateExpressions(expressionList);
-      MyCalc.removeExpressionById(expressionId);
-    } else {
-      const currId = expressionId.split('_')[0];
-      const sameIdItem = MyCalc.getExpression(`final_${currId}`)
-      if (sameIdItem) {
-        // throw Error('Same id for some reason')
-      }
-      const idFilter = `${currId}_`;
-      const filteredExpressions = MyCalc.getExpressions().filter((expression) => expression.id.startsWith(idFilter));
-      const baseExpression = MyCalc.getExpression(`${currId}_0`);
-
-      if (!baseExpression) {
-        throw Error(`Cannot find expression with id ${currId}_0`)
-      }
-      const conic = createGraphObject(baseExpression);
-
-      const expressionList = [];
-      MyCalc.removeExpressions(filteredExpressions);
-      const allExpressions = MyCalc.getExpressions();
-
-      for (let i = 0; i < allExpressions.length; i++) {
-        const expression = allExpressions[i];
-        if (expression.latex) {
-          if (usesVariable(expression.latex, conic.graphId)) {
-            expression.latex = substituteFromId(expression.latex, conic.graphId);
-            expressionList.push(expression);
-          }
-        }
-      }
-      MyCalc.updateExpressions(expressionList);
-
-      conic.latex = conic.convertToStandard();
-      if (sameIdItem) {
-        conic.id = `final_${globalId}`;
-        globalId += 1
-      } else {
-        conic.id = `final_${conic.graphId}`;        
-      }
-      MyCalc.setExpression(conic);
-    }
-  }
-
   function createDefaultConic(graphType: number) {
     const coordinates = MyCalc.graphpaperBounds.mathCoordinates;
-    expressionPos = { x: parseFloat(((coordinates.left + coordinates.right) / 2).toFixed(4)), y: parseFloat(((coordinates.top + coordinates.bottom) / 2).toFixed(4)) };
+    expressionPos = { x: parseFloat(((coordinates.left + coordinates.right) / 2).toFixed(MyCalc.precision)), y: parseFloat(((coordinates.top + coordinates.bottom) / 2).toFixed(MyCalc.precision)) };
     const verticalSize = (coordinates.top - coordinates.bottom);
     const horizontalSize = (coordinates.right - coordinates.left);
     const size = Math.min(verticalSize, horizontalSize);
-    GraphTypes[graphType].setDefault(globalId, expressionPos, size)
+    GraphTypes[graphType].setDefault(MyCalc.globalId, expressionPos, size)
     if (GraphTypes[graphType].hasCenter) {
-      setVariable(`h_{${globalId}}`, expressionPos.x);
-      setVariable(`k_{${globalId}}`, expressionPos.y);
+      setVariable(`h_{${MyCalc.globalId}}`, expressionPos.x);
+      setVariable(`k_{${MyCalc.globalId}}`, expressionPos.y);
     }
     if (GraphTypes[graphType].hasCrop) {
-      setVariable(`x_{${globalId}cam}`, -size * 0.4);
-      setVariable(`y_{${globalId}cam}`, -size * 0.4);
-      setVariable(`x_{${globalId}cbm}`, size * 0.4);
-      setVariable(`y_{${globalId}cbm}`, size * 0.4);
+      setVariable(`x_{${MyCalc.globalId}cam}`, -size * 0.4);
+      setVariable(`y_{${MyCalc.globalId}cam}`, -size * 0.4);
+      setVariable(`x_{${MyCalc.globalId}cbm}`, size * 0.4);
+      setVariable(`y_{${MyCalc.globalId}cbm}`, size * 0.4);
     }
-    createConic(graphType, globalId)
-    globalId += 1
+    createConic(graphType, MyCalc.globalId)
+    MyCalc.globalId += 1
   }
 
   function freeze(force: boolean, append?: boolean) {
@@ -416,22 +322,27 @@ function main() {
       const expressionsString = localStorage.getItem('expressions')
       if (expressionsString) {
         const expressions: Expression[] = JSON.parse(expressionsString);
-        let newId = globalId
+        let newId = MyCalc.globalId
         let newShadeId = shadeId
-        const newExpressions = expressions.map((_expression) => {
+        const baseExpressions = expressions.filter(isBaseExpression)
+        const newExpressions: BaseExpression[] = []
+        baseExpressions.forEach((_expression) => {
           const expression = _expression
-          const split = expression.id.split("_")
-          if (split[0] === "final") {
-            expression.id = `final_${newId}`
-            newId += 1             
-          } else if (split[0] === "shade") {
-            expression.id = `shade_${newShadeId}`
-            newShadeId += 1
+          if (!MyCalc.existingExpressions.has(expression.latex)) {
+            const split = expression.id.split("_")
+            if (split[0] === "final") {
+              expression.id = `final_${newId}`
+              newId += 1             
+            } else if (split[0] === "shade") {
+              expression.id = `shade_${newShadeId}`
+              newShadeId += 1
+            }
+            MyCalc.existingExpressions.add(expression.latex)
+            newExpressions.push(expression)
           }
-          return expression
         })
         MyCalc.setExpressions(newExpressions)
-        globalId = newId
+        MyCalc.globalId = newId
         shadeId = newShadeId
       }
     } else {
@@ -451,12 +362,14 @@ function main() {
           return graphExpression;
         });
         const graphExpressionsBaseLatex = graphExpressionsBase.map((_graphExpression) => {
-          const conic = createGraphObject(_graphExpression);
-          conic.latex = conic.convertToStandard();
-          conic.id = `final_${newId}`;
-          conic.graphId = newId;
-          newId += 1;
-          return conic.toExpression();
+          if (isBaseExpression(_graphExpression)) {
+            const conic = createGraphObject(_graphExpression);
+            conic.latex = conic.convertToStandard();
+            conic.id = `final_${newId}`;
+            conic.graphId = newId;
+            newId += 1;
+            return conic.toExpression();
+          }
         });
         const graphExpressionsFinalLatex = graphExpressionsFinal.map((_graphExpression) => {
           const graphExpression = _graphExpression;
@@ -466,16 +379,38 @@ function main() {
         });
         const graphExpressionsShadeLatex = graphExpressionsShade.map((_graphExpression) => {
           const graphExpression = _graphExpression;
-          const latex = substituteParenthesis(graphExpression.latex);
-          const expression = { color: graphExpression.color, fillOpacity: graphExpression.fillOpacity, hidden: false, id: graphExpression.id, latex, type: 'expression' };
-          return expression;
+          if (isBaseExpression(graphExpression)) {
+            const latex = substituteParenthesis(graphExpression.latex);
+            const expression: InputBaseExpression & {fillOpacity: string} = {
+              color: graphExpression.color,
+              fillOpacity: graphExpression.fillOpacity,
+              hidden: false,
+              id: graphExpression.id,
+              latex,
+              type: "expression",
+              label: JSON.stringify({
+                graphType: "shade"
+              })
+            };
+            return expression;
+          }
         });
-        const latexAll = [
+        const _latexAll = [
           ...graphExpressionsNormalLatex,
           ...graphExpressionsShadeLatex,
           ...graphExpressionsBaseLatex,
           ...graphExpressionsFinalLatex,
         ];
+        const latexAll = _latexAll.filter(expression => {
+          if (expression && isBaseExpression(expression)) {
+            if (!MyCalc.existingExpressions.has(expression.latex)) {
+              MyCalc.existingExpressions.add(expression.latex)
+              return true
+            }
+            console.log('bruh')
+          }
+          return false
+        })
         localStorage.setItem('expressions', JSON.stringify(latexAll));
       } else {
         const expressionsString = localStorage.getItem('expressions')
@@ -492,19 +427,10 @@ function main() {
     shadingData.lastLowerBoundary = { x: MyCalc.linkedVariable(Infinity), y: MyCalc.linkedVariable(Infinity) };
   }
 
-  function finalizeId(_id: string) {
-    if (_id.startsWith('final_')) {
-      unfinalize(_id);
-    } else if (_id.includes('_')) {
-      finalize(_id);
-    } else {
-      unfinalizeConvert(_id);
-    }
-  }
   function fixNegative() {
     let toFix: Expression[] = [];
-    const negativeab = MyCalc.getExpressions()
-      .filter((x) => /[ab]_{\d*\w+}=-\d+[.]{0,1}\d*/g.test(x.latex)); // Selects ellipse, hyperbola with negative a, b
+    const allExpressions = MyCalc.getExpressions().filter(isBaseExpression)
+    const negativeab = allExpressions.filter((x) => /[ab]_{\d*\w+}=-\d+[.]{0,1}\d*/g.test(x.latex)); // Selects ellipse, hyperbola with negative a, b
     toFix = [...toFix, ...negativeab.map((expression) => {
       expression.latex.replaceAll('-', '');
       return expression;
@@ -512,40 +438,19 @@ function main() {
     MyCalc.updateExpressions(toFix);
   }
 
-  function deleteById(_id: string) {
-    if (_id.includes('_')) {
-      if (['shade', 'final'].includes(_id.split('_')[0])) {
-        const expression = MyCalc.getExpression(_id);
-        if (expression) {
-          MyCalc.removeExpression(expression);
-        }
-      } else {
-        const graphId = parseInt(_id.split('_')[0]);
-        const idFilter = `${graphId}_`;
-        let filteredExpressions = MyCalc.getExpressions();
-        filteredExpressions = filteredExpressions.filter((x) => x.id.startsWith(idFilter));
-        MyCalc.removeExpressions(filteredExpressions);
-        // MyCalc.removeExpressions(MyCalc.dependsOn(parseInt(currId)))
-        const expressionList = MyCalc.dependsOn(graphId).map((_expression) => {
-          const expression = _expression
-          expression.latex = substituteFromId(expression.latex, graphId)
-          return expression
-        })
-        MyCalc.updateExpressions(expressionList); 
-      }
-    }
-  }
-
   function changeCropMode(_id: string) {
     if (_id.includes('_')) {
-      const currId = _id.split('_')[0];
-      const idFilter = `${currId}_`;
-      let filteredExpressions = MyCalc.getExpressions();
-      filteredExpressions = filteredExpressions.filter((x) => x.id.startsWith(idFilter) && !x.id.includes('folder'));
+      const graphId = _id.split('_')[0];
+      const idFilter = `${graphId}_`;
+      const filteredExpressions = MyCalc.getExpressions();
+      const baseExpressions = filteredExpressions.filter(isBaseExpression);
+      const idFilteredExpressions = baseExpressions.filter((x) => x.id.startsWith(idFilter))
       const graphExpression = filteredExpressions.find((x) => x.id.endsWith('_0'));
 
       if (!graphExpression) {
         throw new Error();
+      } else if (!isBaseExpression(graphExpression)) {
+        throw new Error("Selected item is not a BaseExpression")
       }
 
       const conic = createGraphObject(graphExpression);
@@ -555,10 +460,10 @@ function main() {
       cropType = (cropType + 1) % 4;
       [conic.latex] = conic.latex.split('\\left\\{');
       const addition = (cropType < 2 ? '\\left\\{x_{1ca}<x<x_{1cb}\\right\\}' : '') + (!(cropType % 2) ? '\\left\\{y_{1ca}<y<y_{1cb}\\right\\}' : '');
-      conic.latex += addition.replaceAll('_{1', `_{${currId}`);
-      const xBoundary = typeFilter(filteredExpressions, graphType, ['x']); // x only domain
-      const yBoundary = typeFilter(filteredExpressions, graphType, ['y']); // y only domain
-      const xyPoints = typeFilter(filteredExpressions, graphType, ['xy']); // points
+      conic.latex += addition.replaceAll('_{1', `_{${graphId}`);
+      const xBoundary = typeFilter(idFilteredExpressions, graphType, ['x']); // x only domain
+      const yBoundary = typeFilter(idFilteredExpressions, graphType, ['y']); // y only domain
+      const xyPoints = typeFilter(idFilteredExpressions, graphType, ['xy']); // points
       const expressionsToSet = [];
       for (let i = 0; i < xBoundary.length; i++) {
         const expression = xBoundary[i];
@@ -580,69 +485,6 @@ function main() {
     }
   }
 
-  function hideCropLines(_id: string) {
-    if (_id.includes('_')) {
-      const idFilter = `${_id.split('_')[0]}_`;
-      let filteredExpressions = MyCalc.getExpressions();
-      filteredExpressions = filteredExpressions.filter((x) => x.id.startsWith(idFilter))
-        .filter((x) => !x.id.includes('folder'));
-      const graphExpression = filteredExpressions.find((x) => x.id.endsWith('_0'));
-
-      if (!graphExpression) {
-        throw new Error();
-      }
-
-      const conic = createGraphObject(graphExpression);
-      const { graphType } = conic;
-      filteredExpressions = typeFilter(filteredExpressions, graphType, ['hide']);
-      let [newExpression] = filteredExpressions;
-      const newState = !newExpression.hidden;
-      const expressionsToSet = [];
-      const cropType = conic.getCropType();
-      const xBoundary = typeFilter(filteredExpressions, graphType, ['x']); // x only domain
-      const yBoundary = typeFilter(filteredExpressions, graphType, ['y']); // y only domain
-      const xyPoints = typeFilter(filteredExpressions, graphType, ['xy']); // points
-      const avoidPoints = [
-        ...xBoundary.map((exp) => exp.id),
-        ...yBoundary.map((exp) => exp.id),
-        ...xyPoints.map((exp) => exp.id),
-      ];
-      if (!newState) {
-        for (let i = 0; i < filteredExpressions.length; i++) {
-          newExpression = filteredExpressions[i];
-          if (!avoidPoints.includes(newExpression.id)) {
-            newExpression.hidden = false;
-          }
-          expressionsToSet.push(newExpression);
-        }
-        for (let j = 0; j < xBoundary.length; j++) {
-          const expression = xBoundary[j];
-          expression.hidden = (cropType % 2 === 1);
-          expressionsToSet.push(expression);
-        }
-        for (let j = 0; j < yBoundary.length; j++) {
-          const expression = yBoundary[j];
-          expression.hidden = (cropType > 1);
-          expressionsToSet.push(expression);
-        }
-        for (let j = 0; j < xyPoints.length; j++) {
-          const expression = xyPoints[j];
-          expression.hidden = (cropType === 3);
-          expressionsToSet.push(expression);
-        }
-      } else {
-        for (let i = 0; i < filteredExpressions.length; i++) {
-          newExpression = filteredExpressions[i];
-          if ('hidden' in newExpression) {
-            newExpression.hidden = newState;
-          }
-          expressionsToSet.push(newExpression);
-        }
-      }
-      MyCalc.updateExpressions(expressionsToSet);
-    }
-  }
-
   function setId() {
     const baseId = Math.max(0, Math.max(...MyCalc.getExpressions()
       .filter((x) => x.id.endsWith('_0'))
@@ -653,8 +495,7 @@ function main() {
       .filter((x) => x.id.startsWith('final_'))
       .map((x) => parseInt(x.id.split('_')[1], 10))
       .filter((x) => !Number.isNaN(x)))) + 1;
-    globalId = Math.max(baseId, finalId);
-    idSet = true;
+    MyCalc.globalId = Math.max(baseId, finalId);
   }
   function shadeToBack() {
     const state = MyCalc.getState();
@@ -665,8 +506,8 @@ function main() {
   }
 
   function toggleShading() {
-    const shade = MyCalc.getExpressions()
-      .filter((x) => x.id.startsWith('shade_') && !x.id.includes('folder'));
+    const baseExpressions = MyCalc.getExpressions().filter(isBaseExpression);
+    const shade = baseExpressions.filter((x) => x.id.startsWith('shade_'))
     const newState = !shade[0].hidden;
     MyCalc.updateExpressions(shade.map((_x) => {
       const x = _x;
@@ -677,22 +518,24 @@ function main() {
   function getBoundsById(_id: string) {
     const graphExpression = MyCalc.getExpression(_id)
     if (graphExpression) {
-      console.log((createGraphObject(graphExpression))
-        .getRealBounds());
+      if (isBaseExpression(graphExpression)) {
+        console.log((createGraphObject(graphExpression))
+          .getRealBounds());
+      }
     }
   }
-  function expressionToFront(_id: string) {
+  function expressionToFront(id: IdParts) {
     const state = MyCalc.getState();
     const expression = state.expressions.list
-      .filter((_expression) => _expression.id === _id);
+      .filter((_expression) => _expression.id === id.id);
     const multipleExpressions = state.expressions.list
-      .filter((_expression) => _expression.id !== _id);
+      .filter((_expression) => _expression.id !== id.id);
     state.expressions.list = expression.concat(multipleExpressions);
     MyCalc.setState(state);
   }
   function keyUpHandler(e: KeyboardEvent) {
     if (MyCalc) MyCalc.updateLinkedVariables()
-    updateVariables();
+    MyCalc.updateVariables();
     setId();
     if (currentlyPressed.includes(e.keyCode)) {
       currentlyPressed = currentlyPressed.filter((key) => key !== e.keyCode);
@@ -701,12 +544,12 @@ function main() {
       const { key } = e;
       if (key === '<') {
         if (MyCalc.selectedExpressionId) {
-          expressionToFront(MyCalc.selectedExpressionId);
+          expressionToFront(getIdParts(MyCalc.selectedExpressionId));
         }
       }
       if (key === 'F') { // F - Finalize
         if (MyCalc.selectedExpressionId) {
-          finalizeId(MyCalc.selectedExpressionId);
+          finalizeId(getIdParts(MyCalc.selectedExpressionId));
         }
       }
     }
@@ -723,6 +566,11 @@ function main() {
     if (e.altKey || (Date.now() - altTime) < 100) {
       altTime = Date.now();
       const { keyCode } = e;
+      if (keyCode === 71) {
+        if (MyCalc.selectedExpressionId) {
+          transformBezier(MyCalc.selectedExpressionId)
+        }
+      }
       if (keyCode === 87) {
         const selection = selections.pop();
       }
@@ -745,11 +593,11 @@ function main() {
       } else if (keyCode === 48) {
         freeze(e.shiftKey, e.ctrlKey);
       } else if (keyCode === 88) {
-        if (MyCalc.selectedExpressionId) deleteById(MyCalc.selectedExpressionId);
+        if (MyCalc.selectedExpressionId) MyCalc.deleteById(MyCalc.selectedExpressionId);
       } else if (keyCode === 81) {
         if (MyCalc.selectedExpressionId) changeCropMode(MyCalc.selectedExpressionId);
       } else if (keyCode === 72) {
-        if (MyCalc.selectedExpressionId) hideCropLines(MyCalc.selectedExpressionId);
+        if (MyCalc.selectedExpressionId) hideCropLines(getIdParts(MyCalc.selectedExpressionId));
       } else if (keyCode === 70) {
         easyMode = !easyMode;
       }
@@ -766,21 +614,32 @@ function main() {
     }
   }
 
-  function fillInside(expressionId: string) {
-    const object = MyCalc.getExpression(expressionId)
-    if (object) {
-      const conic = createGraphObject(object);
-      if ([0, 4].includes(conic.graphType)) {
-        conic.latex = conic.latex.replace('=', '>');
-      } else if ([1, 2, 3, 5, 6].includes(conic.graphType)) {
-        conic.latex = conic.latex.replace('=', '<');
+  function fillInside(id: string) {
+    const expression = MyCalc.getExpression(id)
+    if (expression) {
+      if (isBaseExpression(expression)) {
+        const conic = createGraphObject(expression);
+        if ([0, 4].includes(conic.graphType)) {
+          conic.latex = conic.latex.replace('=', '>');
+        } else if ([1, 2, 3, 5, 6].includes(conic.graphType)) {
+          conic.latex = conic.latex.replace('=', '<');
+        }
+        MyCalc.setExpression({
+          color: 'BLACK',
+          hidden: false,
+          type: "expression",
+          id: `shade_${shadeId}`,
+          latex: conic.latex,
+          label: JSON.stringify({
+            graphType: "shade"
+          })
+        });
+        shadeId += 1;
       }
-      MyCalc.setExpression({ color: 'BLACK', hidden: false, type: 'expression', id: `shade_${shadeId}`, latex: conic.latex });
-      shadeId += 1;
     }
   }
 
-  function fillIntersection(lowerId: string, upperId: string, axis: string) {
+  function fillIntersection(lowerId: string, upperId: string, axis: string, options?: {useValue: boolean}) {
     const lowerObject = MyCalc.getExpression(lowerId)
     const upperObject = MyCalc.getExpression(upperId)
 
@@ -788,6 +647,9 @@ function main() {
       throw new Error("This shouldn't happen");
     }
 
+    if (!isBaseExpression(lowerObject) || !isBaseExpression(upperObject)) {
+      throw new Error('bruh')
+    }
     const lowerConic = createGraphObject(lowerObject);
     const upperConic = createGraphObject(upperObject);
 
@@ -811,11 +673,17 @@ function main() {
 
       shadingData.lastUpperBoundary.y = realMax;
       shadingData.lastLowerBoundary.y = realMin;
-      const bounds = generateBounds(
+      const boundsObject = generateBounds(
         realMin, MyCalc.linkedVariable(-Infinity), realMax, MyCalc.linkedVariable(Infinity),
-      ).reference;
+      );
+      let bounds: string;
+      if (options?.useValue) {
+        bounds = boundsObject.value 
+      } else {
+        bounds = boundsObject.reference
+      }
 
-      const newExpressions = [];
+      const newExpressions: (InputBaseExpression & {fillOpacity: string})[] = [];
       const lowerConicConverted = lowerConic.convertToYRelevant();
       const upperConicConverted = upperConic.convertToYRelevant();
 
@@ -824,7 +692,17 @@ function main() {
         for (let upperIndex = 0; upperIndex < upperConicConverted.length; upperIndex++) {
           const currUpperConic = upperConicConverted[upperIndex];
           const newExpression = `${currLowerConic}<y<${currUpperConic}${bounds}`;
-          newExpressions.push({ color: 'BLACK', hidden: false, type: 'expression', id: `shade_${shadeId}`, latex: newExpression, fillOpacity: '1' });
+          newExpressions.push({
+            color: 'BLACK',
+            hidden: false,
+            type: "expression",
+            id: `shade_${shadeId}`,
+            latex: newExpression,
+            fillOpacity: '1',
+            label: JSON.stringify({
+              graphType: "shade"
+            })
+          });
           shadeId += 1;
         }
       }
@@ -846,10 +724,15 @@ function main() {
 
       shadingData.lastUpperBoundary.x = realMax;
       shadingData.lastLowerBoundary.x = realMin;
-      const bounds = generateBounds(MyCalc.linkedVariable(-Infinity), realMin, MyCalc.linkedVariable(Infinity), realMax)
-        .reference;
+      const boundsObject = generateBounds(MyCalc.linkedVariable(-Infinity), realMin, MyCalc.linkedVariable(Infinity), realMax);
+      let bounds: string;
+      if (options?.useValue) {
+        bounds = boundsObject.value 
+      } else {
+        bounds = boundsObject.reference
+      }
 
-      const newExpressions = [];
+      const newExpressions: InputBaseExpression[] = [];
       const lowerConicConverted = lowerConic.convertToXRelevant();
       const upperConicConverted = upperConic.convertToXRelevant();
 
@@ -858,7 +741,16 @@ function main() {
         for (let upperIndex = 0; upperIndex < upperConicConverted.length; upperIndex++) {
           const currUpperConic = upperConicConverted[upperIndex];
           const newExpression = `${currLowerConic}<x<${currUpperConic}${bounds}`;
-          newExpressions.push({ color: 'BLACK', hidden: false, type: 'expression', id: `shade_${shadeId}`, latex: newExpression });
+          newExpressions.push({
+            color: 'BLACK',
+            hidden: false,
+            type: "expression",
+            id: `shade_${shadeId}`,
+            latex: newExpression,
+            label: JSON.stringify({
+              graphType: "shade"
+            })
+          });
           shadeId += 1;
         }
       }
@@ -871,7 +763,7 @@ function main() {
     if (MyCalc.selectedExpressionId) {
       lastSelectedId = MyCalc.selectedExpressionId;
     }
-    updateVariables();
+    MyCalc.updateVariables();
     if (!shadeIdSet) {
       shadeId = getShadeId() + 1;
       shadeIdSet = true;
@@ -880,17 +772,14 @@ function main() {
       // if (easySelections.length > 4) {
       //   easySelections.pop()
       // }
-      console.log(easySelections)
       if (e.button === 0) {
         const selectedExpression = MyCalc.getSelected()
         MyCalc.selectedExpressionId = undefined
-        if (selectedExpression?.type === 'expression' && isGraph(selectedExpression)) {
-          console.log(selectedExpression)
+        if (selectedExpression && isBaseExpression(selectedExpression) && isGraph(selectedExpression)) {
           const point = createGraphObject(selectedExpression).getClosestEndpoint(MyCalc.pixelsToMath({
             x: e.clientX,
             y: e.clientY,
           }))
-          console.log(point)
           easySelections.push({
             x: point.x.value,
             y: point.y.value,
@@ -899,27 +788,22 @@ function main() {
           easySelections.push(MyCalc.pixelsToMath({ x: e.clientX, y: e.clientY }));
         }
       }
-      if (e.button == 1 || easySelections.length === 4) {
+      console.log(easySelections, e.button)
+      if (e.button == 1) {
         if (easySelections.length === 1) {
 
         } 
         if (easySelections.length === 2) {
-          setVariable(`x_{${globalId}a}`, easySelections[0].x);
-          setVariable(`y_{${globalId}a}`, easySelections[0].y);
-          setVariable(`x_{${globalId}b}`, easySelections[1].x);
-          setVariable(`y_{${globalId}b}`, easySelections[1].y);
-          createConic(6, globalId)
-          globalId += 1
+          createLineSegment(easySelections[0], easySelections[1], MyCalc.globalId, {finalize: true})
         }
         if (easySelections.length === 4) {
-          const criticalPoints = createBezier(
+          createBezier(
             easySelections[0],
             easySelections[1],
             easySelections[2],
             easySelections[3],
-            globalId
+            MyCalc.globalId
           )
-          console.log(criticalPoints)
           // MyCalc.regression(easySelections)
         }
         easySelections = []
@@ -928,8 +812,7 @@ function main() {
       if (e.button === 1) {
         const shade = MyCalc.getExpressions().filter((expression) => expression.id.includes("shade_"))
         shade.forEach((shade) => {
-          const {xMin, xMax, yMin, yMax} = parseDomains(getDomainsFromLatex(shade.latex))
-          
+          // const {xMin, xMax, yMin, yMax} = parseDomains(getDomainsFromLatex(shade.latex))
         })
       }
       if (currentlyPressed.includes(65)) {
@@ -956,29 +839,32 @@ function main() {
 
           let upperId = upperSelection.id;
           let lowerId = lowerSelection.id;
+  
+          const lowerIdParts = getIdParts(lowerId)
+          const upperIdParts = getIdParts(upperId)
 
           if (upperId === lowerId) {
-            const lowerFinal = lowerId.startsWith('final_');
-            if (lowerFinal) {
-              unfinalize(lowerId);
-              lowerId = `${lowerId.split('_')[1]}_0`;
+            if (lowerIdParts.isFinal) {
+              unfinalize(lowerIdParts);
+              lowerId = `${lowerIdParts.graphId}_0`;
             }
+            const newLowerIdParts = getIdParts(lowerId)
             fillInside(lowerId);
-            if (lowerFinal) finalize(lowerId);
+            if (newLowerIdParts.isEditable && lowerIdParts.isFinal) finalize(newLowerIdParts);
           } else {
-            const lowerFinal = lowerId.startsWith('final_');
-            const upperFinal = upperId.startsWith('final_');
-            if (lowerFinal) {
-              unfinalize(lowerId, true);
-              lowerId = `${lowerId.split('_')[1]}_0`;
+            if (lowerIdParts.isFinal) {
+              unfinalize(lowerIdParts, {logical: true});
+              lowerId = `${lowerIdParts.graphId}_0`;
             }
-            if (upperFinal) {
-              unfinalize(upperId, true);
-              upperId = `${upperId.split('_')[1]}_0`;
+            if (upperIdParts.isFinal) {
+              unfinalize(upperIdParts, {logical: true});
+              upperId = `${upperIdParts.graphId}_0`;
             }
-            fillIntersection(lowerId, upperId, axis);
-            if (lowerFinal) finalize(lowerId);
-            if (upperFinal) finalize(upperId);
+            const newLowerIdParts = getIdParts(lowerId)
+            const newUpperIdParts = getIdParts(upperId)
+            fillIntersection(lowerId, upperId, axis, {useValue: true});
+            if (newLowerIdParts.isEditable && lowerIdParts.isFinal) MyCalc.removeExpressionById(lowerId);
+            if (newUpperIdParts.isEditable && upperIdParts.isFinal) MyCalc.removeExpressionById(upperId);
           }
           lastCenterPoint = centerPoint;
         }
@@ -1000,13 +886,12 @@ function main() {
 
   function changeColor() {
     const graphExpression = MyCalc.getExpression(lastSelectedId);
-    if (graphExpression) {
+    if (graphExpression && isBaseExpression(graphExpression)) {
       const colorForm = $('#colorForm');
       if (colorForm) {
-        const data = colorForm.serializeArray();
-        data.forEach((pair) => {
-          graphExpression[pair.name] = pair.value;
-        });
+        const [color, fillOpacity] = colorForm.serializeArray();
+        graphExpression.color = color.value
+        graphExpression.fillOpacity = fillOpacity.value
         MyCalc.updateExpression(graphExpression);
       }
     }
@@ -1053,7 +938,7 @@ function main() {
   unsafeWindow.changeColor = changeColor;
   unsafeWindow.changegraphType = changegraphType;
   unsafeWindow.createConicHandler = createConicHandler;
-  unsafeWindow.deleteById = deleteById;
+  unsafeWindow.deleteById = MyCalc.deleteById;
   unsafeWindow.toggleArtist = toggleArtist;
 }
 

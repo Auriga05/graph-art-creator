@@ -1,13 +1,28 @@
+import { Bounds, GeneralConicVariables, NumberBounds } from './../types';
 import { Conic } from "../classes/Conic";
 import { Graph } from "../classes/Graph";
 import { defaultExpressionFormat, xExpressions, yExpressions } from "../constants";
 import { MyCalc } from "../index.user";
-import { Expression, getVariable, LinkedVariable, substitute, getDomains, generateBounds, setVariable } from "../lib";
+import { getVariable, LinkedVariable, substitute, getDomains, generateBounds, setVariable } from "../lib";
+import { Expression, InputBaseExpression } from "../types";
 
+export type VerticalParabolaVariables = {
+  h: number,
+  k: number,
+  c: number,
+}
+
+export type VerticalParabolaData = {
+  graphType: 2
+  variables: VerticalParabolaVariables | {[Property in keyof VerticalParabolaVariables]: LinkedVariable}
+  bounds: Bounds
+}
 export class VerticalParabola extends Graph implements Initializable, Conic {
   static hasCenter = true;
   static hasCrop = true;
-  isConic = true;
+  static graphType = 2;
+  static isConic = true;
+  static hasGeneralForm = true;
   static expressionFormat = [ // Vertical Parabola (y)
     { latex: '\\left(x-h_{1}\\right)^{2}=4c_{1}\\left(y-k_{1}\\right)', types: ['graph'] },
     { latex: '\\left(h_{1},k_{1}\\right)', types: ['point', 'hide'] },
@@ -21,8 +36,17 @@ export class VerticalParabola extends Graph implements Initializable, Conic {
     ...yExpressions[2].map((yExpression, c) => ({ latex: `f_{1y${String.fromCharCode(97 + c)}}(x)=${yExpression}`, types: ['y_expression'], name: `f_{1y${String.fromCharCode(97 + c)}}` })),
     ...xExpressions[2].map((xExpression, c) => ({ latex: `f_{1x${String.fromCharCode(97 + c)}}(y)=${xExpression}`, types: ['x_expression'], name: `f_{1x${String.fromCharCode(97 + c)}}` })),
   ]
-  constructor(expression: Expression) {
+  constructor(expression: InputBaseExpression) {
     super(expression, 2);
+  }
+
+  static fromGeneral(variable: GeneralConicVariables) {
+    const {A, C, D, E, F} = variable
+    const h = -D / (2 * A);
+    const c = -E / (4 * A);
+    const k = (F - A * h ** 2) / (4 * c * A);
+  
+    return { h, k, c };
   }
 
   getGeneralForm() {
@@ -35,7 +59,7 @@ export class VerticalParabola extends Graph implements Initializable, Conic {
     const D = -2 * h;
     const E = -4 * c;
     const F = 4 * c * k + h ** 2;
-    return { A, C, D, E, F };
+    return { A, B:0, C, D, E, F };
   }
 
   getConicVariables() {
@@ -46,11 +70,15 @@ export class VerticalParabola extends Graph implements Initializable, Conic {
     return { h, k, c };
   }
 
+  getGraphVariables() {
+    return this.getConicVariables()
+  }
+
   convertToStandard() {
     let { latex } = this;
     const currId = this.graphId;
     const { xMin, yMin, xMax, yMax } = this.getBounds();
-    latex = latex.replace(`4c_{${currId}}`, (4 * getVariable(`c_{${currId}}`)).toFixed(4));
+    latex = latex.replace(`4c_{${currId}}`, (4 * getVariable(`c_{${currId}}`)).toFixed(MyCalc.precision));
     latex = substitute(latex);
     latex = `${latex.split('\\left\\{')[0]}${generateBounds(xMin, yMin, xMax, yMax).value}`;
     latex = latex.replaceAll('--', '+');
@@ -67,8 +95,8 @@ export class VerticalParabola extends Graph implements Initializable, Conic {
     const { h, k, c } = variables;
 
     points = [
-      { x: MyCalc.linkedVariable(null, -Infinity), y: MyCalc.linkedVariable(null, Infinity) },
-      { x: MyCalc.linkedVariable(null, Infinity), y: MyCalc.linkedVariable(null, Infinity) },
+      { x: MyCalc.linkedVariable(-Infinity), y: MyCalc.linkedVariable(Infinity) },
+      { x: MyCalc.linkedVariable(Infinity), y: MyCalc.linkedVariable(Infinity) },
       { x: h, y: k },
     ];
 
@@ -101,8 +129,11 @@ export class VerticalParabola extends Graph implements Initializable, Conic {
     return {h, k, c}
   }
 
-  static setGraphVariables(variables: ReturnType<typeof VerticalParabola.transformVariables>, graphId: number) {
-    const { h, c, k } = variables;
+  static setGraphVariables(variables: VerticalParabolaVariables | {[Property in keyof VerticalParabolaVariables]: LinkedVariable}, graphId: number) {
+    let { h, c, k } = variables;
+    if (h instanceof LinkedVariable) h = h.value
+    if (c instanceof LinkedVariable) c = c.value
+    if (k instanceof LinkedVariable) k = k.value
     const d = Math.sign(c) / 4;
     const e = Math.sqrt(Math.abs(c));
     setVariable(`h_{${graphId}}`, h);

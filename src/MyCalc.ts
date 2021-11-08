@@ -1,44 +1,15 @@
-import { createGraphObject, Expression, functionRegex, intersectConics, LinkedVariable, usesVariable } from "./lib";
+import { Coordinate } from './mathLib';
+import { createGraphObject, functionRegex, getDomainsFromLatex, getGraphType, getIdParts, getVariable, getVariablesNeeded, GraphTypes, hax, isBaseExpression, isFinal, LinkedVariable, parseDomains, substitute, substituteFromId, substituteToAll, transformBezier, usesVariable } from "./lib";
 import { parse } from 'svg-parser'
-import { Conic } from "./classes/Conic";
-interface ExpressionAnalysis { evaluation ? : { type: string
-  value: number
-}
-}
-interface ControllerType {
-getItemModel: (_id: string) => Expression
-getItemCount: () => number
-dispatch: (args: {
-  [key: string]: any,
-  type: string,
-}) => any
-}
-export interface CalcType { getExpressions: () => Expression[]
-expressionAnalysis: {
-  [key: string]: ExpressionAnalysis
-}
-selectedExpressionId: string
-removeExpressions: (expressions: Expression[]) => void
-removeExpression: (expression: Expression) => void
-setExpressions: (expressions: Expression[]) => void
-setExpression: (expression: Partial<Expression>) => void
-pixelsToMath: (point: {x: number, y: number}) => {x: number, y: number}
-graphpaperBounds: { mathCoordinates: { left: number
-      right: number
-      top: number
-      bottom: number
-    }
-  }, setState: (state: State) => void
-getState: () => State
-removeSelected: () => void
-controller: ControllerType
-}
-
-interface State {
-  expressions: {
-    list: Expression[]
-  }
-}
+import { parseSVG, makeAbsolute, Command, CommandMadeAbsolute } from "svg-path-parser"
+import { createGraphWithBounds } from "./index.user";
+import { CalcType, ControllerType, State } from "./desmosTypes";
+import { BaseExpression, Expression, GeneralConicVariables, InputBaseExpression, MinBaseExpression, TableExpression } from "./types";
+import { finalize, finalizeId, unfinalize } from "./actions/finalize";
+import { Bezier } from "./graphs/Bezier";
+import { getGraphTypeFromStandard } from './actions/convertFromStandard';
+import { hideCropLines } from './actions/hideCropLines';
+import { Graph } from './classes/Graph';
 export class MyCalcClass {
   Calc: CalcType
 
@@ -46,33 +17,99 @@ export class MyCalcClass {
 
   linkedVariables: {[key: string]: LinkedVariable}
 
-  usedId: number[]
+  usedId: Set<number>
 
   logicalExpressions: {[key: string]: Expression}
 
   globalVariablesObject: {[key: string]: string}
 
   globalFunctionsObject: {[key: string]: {id: string, args: string[], definition: string}}
+  
+  expressionsToRemove: {beforeRemove: string, expressions: Expression[]}[]
+
+  lastControlPoint: {
+    cubic: Coordinate
+    quadratic: Coordinate
+  }
+  
+  paths: {
+    command: CommandMadeAbsolute,
+    details: {
+      dx: number,
+      dy: number,
+      color: string,
+      isStart: boolean,
+    }
+  }[]
+
+  haxIndex: number
+
+  globalId: number
+
+  isProcessing: boolean
+
+  toFinalizeId: Set<string>
+
+  isProcessingFinalize: boolean
+
+  haxOnTick: boolean
+
+  minRes: number
+
+  doneLines: Set<string>
+
+  precision: number
+
+  existingExpressions: Set<string>
 
   constructor(_Calc: CalcType) {
     this.Calc = _Calc;
     this.Controller = _Calc.controller;
     this.logicalExpressions = {}
-    this.usedId = []
+    this.usedId = new Set<number>()
     this.globalVariablesObject = {}
     this.globalFunctionsObject = {}
     this.linkedVariables = {}
+    this.expressionsToRemove = []
+    this.paths = []
+    this.haxIndex = 0
+    this.globalId = 1
+    this.isProcessing = false
+    this.toFinalizeId = new Set<string>()
+    this.isProcessingFinalize = false
+    this.haxOnTick = false
+    this.minRes = 0
+    this.doneLines = new Set<string>()
+    this.existingExpressions = new Set<string>()
+    this.precision = 6;
+    this.lastControlPoint = {
+      cubic: { x: 0, y: 0 },
+      quadratic: { x: 0, y: 0 },
+    }
     this.update();
     this.init()
   }
 
+  unfinalizeAll() {
+    const expressions = this.getExpressions()
+      .filter(isBaseExpression)
+      .map(x => getIdParts(x.id))
+      .filter(isFinal)
+    expressions.forEach(x => unfinalize(x))
+    expressions.forEach(x => {
+      try {
+        hideCropLines(getIdParts(`${x.graphId}_0`))
+      } catch {
+        console.log('you suck')
+      }
+    })
+  }
+
   init() {
     this.getExpressions().forEach((expression) => {
-      if (expression.id.includes('_')) {
-        const split = expression.id.split('_')
-        if (split[0] === 'final') {
-          this.usedId.push(parseInt(split[1]))
-        } else if (/\d+/.test(split[0])) {
+      if (isBaseExpression(expression)) {
+        const id = getIdParts(expression.id)
+        if (id.isEditable) {
           const matches = [...expression.latex.matchAll(functionRegex)]
           if (matches.length > 0) { // Is a function
             this.globalFunctionsObject[matches[0][1]] = {
@@ -81,12 +118,15 @@ export class MyCalcClass {
               definition: expression.latex.split('=')[1],
             }
           }
-          if (expression.id.endsWith('_0')) {
-            this.usedId.push(parseInt(split[0]))
+          if (id.graphId === 0) {
+            this.usedId.add(id.graphId)
           }
+        } else if (id.isFinal) {
+          this.usedId.add(id.graphId)
         }
       }
     })
+    setInterval(() => this.tick(), 100);
   }
 
   update() {
@@ -95,22 +135,42 @@ export class MyCalcClass {
     const maxNumber: {[key: number]: number} = {};
     expressions.forEach((_expression) => {
       const expression = _expression;
-      if (expression.latex) {
-        if (expression.latex.includes('e_{')) {
-          expression.latex = expression.latex.replace('e_{', 'q_{');
-          expressionsToSet.push(expression);
-        }
-        if (expression.id.includes('_')) {
-          const split = expression.id.split('_')
-          if (!['final', 'shade'].includes(split[0])) {
-            const id = parseInt(split[0])
-            const num = parseInt(split[1])
-            if (id in maxNumber) {
-              if (num > maxNumber[id]) {
-                maxNumber[id] = num
+      if (isBaseExpression(expression)) {
+        if (expression.latex) {
+          if (expression.latex.includes('e_{')) {
+            expression.latex = expression.latex.replace('e_{', 'q_{');
+            expressionsToSet.push(expression);
+          }
+          if (expression.id.includes('_')) {
+            const split = expression.id.split('_')
+            if (split[0] === 'final') {
+              // const graphId = parseInt(split[1])
+              if (!expression.label) {
+                const graphType = getGraphTypeFromStandard(expression.latex)
+                expression.label = JSON.stringify({
+                  graphType
+                })
+                expressionsToSet.push(expression)
               }
-            } else {
-              maxNumber[id] = num
+            } else if (!['final', 'shade'].includes(split[0])) {
+              const id = parseInt(split[0])
+              const graphId = parseInt(split[1])
+              if (id in maxNumber) {
+                if (graphId > maxNumber[id]) {
+                  maxNumber[id] = graphId
+                }
+              } else {
+                maxNumber[id] = graphId
+              }
+              if (graphId === 0) {
+                if (!expression.label) {
+                  const graphObject = createGraphObject(expression)
+                  graphObject.label = JSON.stringify({
+                    graphType: graphObject.graphType
+                  })
+                  expressionsToSet.push(graphObject)
+                }
+              }
             }
           }
         }
@@ -134,7 +194,6 @@ export class MyCalcClass {
       if (expression) {
         return expression
       }
-      return undefined
     }
   }
 
@@ -142,7 +201,7 @@ export class MyCalcClass {
     return this.Calc.getExpressions();
   }
   
-  setLogicalExpression(expression: Expression) {
+  setLogicalExpression(expression: InputBaseExpression | TableExpression) {
     if (!Object.keys(this.logicalExpressions).includes(expression.id)) {
       this.logicalExpressions[expression.id] = expression;
     }
@@ -160,18 +219,15 @@ export class MyCalcClass {
     this.Controller.dispatch({type: "set-selected-id", id: id})
   }
 
-  removeExpressions(expressions: Expression[]) {
+  removeExpressions(expressions: Partial<Expression>[]) {
     expressions.forEach((expression) => {
-      const split = expression.id.split('_')
-      if (['final', 'shade'].includes(split[0])) {
-        const id = parseInt(split[1])
-        if (this.usedId.includes(id)) {
-          this.usedId = this.usedId.filter(_id => _id !== id)
-        }
-      } else {
-        const id = parseInt(split[0])
-        if (this.usedId.includes(id)) {
-          this.usedId = this.usedId.filter(_id => _id !== id)
+      if (!expression.id) {
+        throw Error("Expression without id")
+      }
+      const id = getIdParts(expression.id);
+      if (id.isFinal || id.isEditable) {
+        if (this.usedId.has(id.graphId)) {
+          this.usedId.delete(id.graphId)
         }
       }
     })
@@ -183,44 +239,141 @@ export class MyCalcClass {
       delete this.logicalExpressions[expression.id]
     } else {
       this.Calc.removeExpression(expression);
-      const split = expression.id.split('_')
-      if (['final', 'shade'].includes(split[0])) {
-        const id = parseInt(split[1])
-        this.usedId = this.usedId.filter(_id => _id !== id)
+      const id = getIdParts(expression.id);
+      if (id.isFinal || id.isEditable) {
+        if (this.usedId.has(id.graphId)) {
+          this.usedId.delete(id.graphId)
+        }
+      }
+    }
+  }
+
+  removeExpressionById(_id: string) {
+    const id = getIdParts(_id)
+    if (id.isEditable || id.isFinal) {
+      if (this.isLogical(id.id)) {
+        const allExpressions = this.getExpressions()
+        const expressionList = substituteToAll(allExpressions, id.graphId)
+        this.updateExpressions(expressionList)
+        delete this.logicalExpressions[id.id]
       } else {
-        const id = parseInt(split[0])
-        this.usedId = this.usedId.filter(_id => _id !== id)
+        const expression = this.getExpression(id.id)
+        if (expression) {
+          this.removeExpression(expression)
+        }
       }
     }
   }
 
-  removeExpressionById(expressionId: string) {
-    if (this.isLogical(expressionId)) {
-      delete this.logicalExpressions[expressionId]
-    } else {
-      const expression = this.getExpression(expressionId)
-      if (expression) {
-        this.removeExpression(expression)
-      }
-    }
-  }
-
-  newGraph(id: number, expressions: Expression[]) {
-    if (this.usedId.includes(id)) {
+  newGraph(id: number, expressions: MinBaseExpression[]) {
+    if (this.usedId.has(id)) {
       throw Error('id already in expressions list')
     } else {
-      this.usedId.push(id)
       this.setExpressions(expressions);
+      this.usedId.delete(id)
+    }
+  }
+
+  tick(this: MyCalcClass) {
+    if (this.haxOnTick) {
+      this.nextHax()
+    }
+    // this.updateVariables()
+    if (this.expressionsToRemove && !this.isProcessing) {
+      this.isProcessing = true
+      this.expressionsToRemove.forEach((expressionGroup) => {
+        const success = true
+        if (expressionGroup.beforeRemove === 'update') {
+          this.updateVariables()
+          const baseExpression = expressionGroup.expressions[0]
+          if (isBaseExpression(baseExpression)) {
+            this.removeExpressionById(baseExpression.latex.split('_')[0])
+          }
+        }
+        if (success) {
+          this.removeExpressions(expressionGroup.expressions)
+        }
+      })
+      this.isProcessing = false
+    }
+    
+    if (this.toFinalizeId && !this.isProcessingFinalize) {
+      this.isProcessingFinalize = true
+      this.toFinalizeId.forEach((_id: string) => {
+        const id = getIdParts(_id)
+        const expression = this.getExpression(id.id)
+        if (expression && isBaseExpression(expression)) {
+          if (expression.id.endsWith('_0')) { 
+            const variablesNeeded = getVariablesNeeded(expression.latex)
+              .map((variable) => variable[0])
+            let values: {[key: string]: LinkedVariable} = {}
+            const graphObject = createGraphObject(expression)
+            let hasValues = false
+            values = {}
+            try {
+              values = graphObject.getGraphVariables()
+              hasValues = true
+            } catch {
+              
+            }
+            if (hasValues) {
+            // console.log(Object.entries(values).map(value => `${value[1].reference}:${value[1].value}`).join(','))
+              if (Object.values(values).every(value => value.value)) {
+                if (graphObject instanceof Bezier) {
+                  transformBezier(graphObject.id)
+                  this.expressionsToRemove.push({
+                    beforeRemove: "update",
+                    expressions: [graphObject.toExpression()]
+                  })
+                } else {
+                  this.updateVariables()
+                  if (id.isEditable) {
+                    finalize(id)
+                  }
+                }
+                this.toFinalizeId.delete(id.id)
+              }
+            }
+          }
+        }
+      })
+      this.isProcessingFinalize = false
+    }
+  }
+
+  deleteById(_id: string) {
+    if (_id.includes('_')) {
+      if (['shade', 'final'].includes(_id.split('_')[0])) {
+        const expression = this.getExpression(_id);
+        if (expression) {
+          this.removeExpression(expression);
+        }
+      } else {
+        const graphId = parseInt(_id.split('_')[0]);
+        const idFilter = `${graphId}_`;
+        let filteredExpressions = this.getExpressions();
+        filteredExpressions = filteredExpressions.filter((x) => x.id.startsWith(idFilter));
+        this.removeExpressions(filteredExpressions);
+        // this.removeExpressions(this.dependsOn(parseInt(currId)))
+        const expressionList = this.dependsOn(graphId).map((_expression) => {
+          const expression = _expression
+          expression.latex = substituteFromId(expression.latex, graphId)
+          return expression
+        })
+        this.updateExpressions(expressionList); 
+      }
     }
   }
 
   setExpressions(expressions: Expression[]) {
-    const expressionsToBeCreated: Expression[] = []
+    const expressionsToBeCreated: Partial<Expression>[] = []
     expressions.forEach((expression) => {
-      if (this.getExpression(expression.id)) {
-        throw Error("Tried to update create existent expression")
-      } else {
-        expressionsToBeCreated.push(expression)
+      if (expression.id) {
+        if (this.getExpression(expression.id)) {
+          throw Error("Tried to update create existent expression")
+        } else {
+          expressionsToBeCreated.push(expression)
+        }
       }
     })
     this.Calc.setExpressions(expressionsToBeCreated);
@@ -238,19 +391,19 @@ export class MyCalcClass {
     this.Calc.setExpressions(expressionsToBeUpdated);
   }
 
-  updateExpression(expression: Partial<Expression>, _logical?: boolean) {
+  updateExpression(expression: BaseExpression, _logical?: boolean) {
     const logical = !!_logical
     if (logical) {
-      this.setLogicalExpression(expression as Expression);
+      this.setLogicalExpression(expression);
     } else {
       this.Calc.setExpression(expression);
     }
   }
 
-  setExpression(expression: Partial<Expression>, _logical?: boolean) {
+  setExpression(expression: InputBaseExpression | TableExpression, _logical?: boolean) {
     const logical = !!_logical
     if (logical) {
-      this.setLogicalExpression(expression as Expression);
+      this.setLogicalExpression(expression);
     } else {
       this.Calc.setExpression(expression);
     }
@@ -295,9 +448,11 @@ export class MyCalcClass {
     const allExpressions = this.getExpressions();
     for (let i = 0; i < allExpressions.length; i++) {
       const expression = allExpressions[i];
-      if (expression.latex) {
-        if (usesVariable(expression.latex, graphId)) {
-          expressionList.push(expression);
+      if (isBaseExpression(expression)) {
+        if (expression.latex) {
+          if (usesVariable(expression.latex, graphId)) {
+            expressionList.push(expression);
+          }
         }
       }
     }
@@ -305,7 +460,7 @@ export class MyCalcClass {
   }
 
   table (points: {x: number, y: number}[]) {
-    const table = {
+    const table: TableExpression = {
       id: "reg_table",
       type: "table",
       columns: [
@@ -313,13 +468,13 @@ export class MyCalcClass {
           latex: "r_{x}",
           color: "BLACK",
           id: "reg_1",
-          values: points.map((point) => parseFloat(point.x.toFixed(4)))
+          values: points.map((point) => point.x.toFixed(this.precision))
         },
         {
           latex: "r_{y}",
           color: "BLACK",
           id: "reg_2",
-          values: points.map((point) => parseFloat(point.y.toFixed(4)))
+          values: points.map((point) => point.y.toFixed(this.precision))
         }
       ]
     }
@@ -334,9 +489,21 @@ export class MyCalcClass {
     this.setExpression(this.table(points))
   }
 
-  linkedVariable(reference: number | string | null, _value ?: number) {
+  linkedVariable(reference: number): LinkedVariable
+  linkedVariable(reference: string, _value ?: number): LinkedVariable
+  linkedVariable(reference: number): LinkedVariable
+  linkedVariable(reference: number | string | {[key: string]: number} | null, _value ?: number) {
     if (typeof reference === 'number') {
       return new LinkedVariable(reference, _value);
+    } else if (typeof reference === 'object') {
+      if (reference) {
+        const newReference: {[key: string]: LinkedVariable} = {}
+        Object.entries(reference)
+          .forEach(pair => {
+            newReference[pair[0]] = this.linkedVariable(pair[1])
+          })
+        return newReference;
+      }
     } else {
       if (reference) {
         if (reference in this.linkedVariables) {
@@ -351,6 +518,7 @@ export class MyCalcClass {
         return new LinkedVariable(reference, _value)
       }
     }
+    throw Error("thing broke")
   }
 
   addLinkedVariable(linkedVariable: LinkedVariable) {
@@ -386,7 +554,7 @@ export class MyCalcClass {
     const aExpression = this.getConicById(a)
     const bExpression = this.getConicById(b)
 
-    if (aExpression && bExpression) {
+    if (aExpression && isBaseExpression(aExpression) && bExpression && isBaseExpression(bExpression)) {
       const aGraph = createGraphObject(aExpression)
       const bGraph = createGraphObject(bExpression)
 
@@ -396,19 +564,102 @@ export class MyCalcClass {
     }
   }
 
+  updateVariables(filter ? : string) {
+    // Object.keys(this.globalVariablesObject).forEach(key => {
+    //   delete this.globalVariablesObject[key];
+    // })
+    let currExpressions = this.getExpressions();
+    if (filter) {
+      const idFilter = `${filter}_`;
+      currExpressions = currExpressions.filter((x) => x.id.startsWith(idFilter));
+    }
+    for (let i = 0; i < currExpressions.length; i++) {
+      const expression = currExpressions[i];
+      const analysis = this.expressionAnalysis[expression.id];
+      if (analysis && isBaseExpression(expression)) {
+        if (analysis.evaluation) {
+          if (analysis.evaluation.type === 'Number') {
+            const variable = expression.latex.split('=')[0];
+            if (variable.includes('_') && !(['x', 'y'].includes(variable))) {
+              this.globalVariablesObject[variable] = analysis.evaluation.value.toString();
+            }
+          }
+        } else if (expression.latex) {
+          if (expression.latex.includes('f_')) {
+            // console.log(expression);
+          }
+        }
+      }
+    }
+  }
+
+  consoleSVG(n: number) {
+    console.log(this.paths[n])
+  }
+  
+  hax(n: number) {
+    hax(this.paths[n])
+  }
+
+  nextHax() {
+    if (this.haxIndex < this.paths.length) {
+      hax(this.paths[this.haxIndex])
+      this.haxIndex += 1
+    } else {
+      this.haxOnTick = false
+    }
+  }
+
   xhr () {
-    const url = "https://upload.wikimedia.org/wikipedia/commons/f/f7/Bananas.svg"
+    const url = "http://localhost:8010/proxy/attachments/831873240694652948/906153339161554944/feather.svg"
+    let paths: {d: string, style?: string, transform?: string}[] = []
     fetch(url)
-       .then( r => r.text() )
-       .then( t => {
-         const svg = parse(t)
-         console.log(svg)
-         const children = svg.children[0]
-         if (children.type === "element") {
-           if (children.tagName === "g") {
-             console.log(children.children)
-           }
-         }
-    })
+      .then( r => r.text() )
+      .then( t => {
+        const svg = parse(t)
+        const child1 = svg.children[0]
+        if (child1.type === "element") {
+          const child2 = child1.children[0]
+          if (typeof child2 !== "string") {
+            if (child2.type === "element") {
+              paths = child2.children.map(child => {
+                if (typeof child !== "string") {
+                  if (child.type === "element") {
+                    return child.properties as any
+                  }
+                }
+              })
+            }
+          }
+        }
+        this.paths = []
+        paths.forEach((path) => {
+          let transform = ""
+          let _dx = "0"
+          let _dy = "0"
+
+          let style = ""
+          let color = "#000000"
+          if (path.transform) {
+            [transform, _dx, _dy] = [...path.transform.matchAll(/translate\((-?\d+(?:.\d+)?) (-?\d+(?:.\d+)?)\)/g)][0]
+          }
+          if (path.style) {
+            [style, color] = [...path.style.matchAll(/fill: (#[0-9a-f]{6})/g)][0]
+          }
+          const commands = makeAbsolute(parseSVG(path.d))
+          const newCommands = commands.map((_command, index) => {
+            return {
+              command: _command,
+              details: {
+                dx: parseFloat(_dx),
+                dy: parseFloat(_dy),
+                color,
+                isStart: index === 0
+              }
+            }
+          })
+          this.paths.push(...newCommands)
+        })
+      })
   }
 }

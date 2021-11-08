@@ -3,6 +3,7 @@ import { LinkedVariable } from "../lib";
 export interface Conic {
   getGeneralForm(): {
     A: number,
+    B: number,
     C: number,
     D: number,
     E: number,

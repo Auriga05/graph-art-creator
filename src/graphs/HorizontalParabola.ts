@@ -1,13 +1,28 @@
+import { Bounds, GeneralConicVariables, NumberBounds } from './../types';
 import { Conic } from "../classes/Conic";
 import { Graph } from "../classes/Graph";
 import { defaultExpressionFormat, xExpressions, yExpressions } from "../constants";
 import { MyCalc } from "../index.user";
-import { Expression, getVariable, LinkedVariable, substitute, generateBounds, getDomains, simplify, setVariable } from "../lib";
+import { getVariable, LinkedVariable, substitute, generateBounds, getDomains, simplify, setVariable } from "../lib";
+import { Expression, InputBaseExpression } from "../types";
 
+export type HorizontalParabolaVariables = {
+  h: number,
+  k: number,
+  c: number,
+}
+
+export type HorizontalParabolaData = {
+  graphType: 1
+  variables: HorizontalParabolaVariables | {[Property in keyof HorizontalParabolaVariables]: LinkedVariable}
+  bounds: Bounds
+}
 export class HorizontalParabola extends Graph implements Initializable, Conic {
   static hasCenter = true;
   static hasCrop = true;
-  isConic = true;
+  static graphType = 1;
+  static isConic = true;
+  static hasGeneralForm = true;
   static expressionFormat = [ // Horizontal Parabola (x)
     { latex: '\\left(y-k_{1}\\right)^{2}=4c_{1}\\left(x-h_{1}\\right)', types: ['graph'] },
     { latex: '\\left(h_{1},k_{1}\\right)', types: ['point', 'hide'] },
@@ -21,8 +36,17 @@ export class HorizontalParabola extends Graph implements Initializable, Conic {
     ...yExpressions[1].map((yExpression, c) => ({ latex: `f_{1y${String.fromCharCode(97 + c)}}(x)=${yExpression}`, types: ['y_expression'], name: `f_{1y${String.fromCharCode(97 + c)}}` })),
     ...xExpressions[1].map((xExpression, c) => ({ latex: `f_{1x${String.fromCharCode(97 + c)}}(y)=${xExpression}`, types: ['x_expression'], name: `f_{1x${String.fromCharCode(97 + c)}}` })),
   ]
-  constructor(expression: Expression) {
+  constructor(expression: InputBaseExpression) {
     super(expression, 1);
+  }
+
+  static fromGeneral(variable: GeneralConicVariables) {
+    const {A, C, D, E, F} = variable
+    const c = -D / (4 * C)
+    const k = -E / (2 * C)
+    const h = (F - C * k ** 2) / (4 * c * C)
+  
+    return { h, k, c };
   }
 
   getGeneralForm() {
@@ -35,7 +59,7 @@ export class HorizontalParabola extends Graph implements Initializable, Conic {
     const D = -4 * c;
     const E = -2 * k;
     const F = 4 * c * h + k ** 2;
-    return { A, C, D, E, F };
+    return { A, B:0, C, D, E, F };
   }
 
   getConicVariables() {
@@ -44,6 +68,10 @@ export class HorizontalParabola extends Graph implements Initializable, Conic {
     const h = MyCalc.linkedVariable(`h_{${graphId}}`);
     const k = MyCalc.linkedVariable(`k_{${graphId}}`);
     return { h, k, c };
+  }
+
+  getGraphVariables() {
+    return this.getConicVariables()
   }
 
   convertToStandard() {
@@ -67,8 +95,8 @@ export class HorizontalParabola extends Graph implements Initializable, Conic {
     const { h, k, c } = variables;
 
     points = [
-      { x: MyCalc.linkedVariable(null, Infinity), y: MyCalc.linkedVariable(null, -Infinity) },
-      { x: MyCalc.linkedVariable(null, Infinity), y: MyCalc.linkedVariable(null, Infinity) },
+      { x: MyCalc.linkedVariable(Infinity), y: MyCalc.linkedVariable(-Infinity) },
+      { x: MyCalc.linkedVariable(Infinity), y: MyCalc.linkedVariable(Infinity) },
       { x: h, y: k },
     ];
 
@@ -101,8 +129,11 @@ export class HorizontalParabola extends Graph implements Initializable, Conic {
     return {h, k, c}
   }
 
-  static setGraphVariables(variables: ReturnType<typeof HorizontalParabola.transformVariables>, graphId: number) {
-    const { k, c, h } = variables;
+  static setGraphVariables(variables: HorizontalParabolaVariables | {[Property in keyof HorizontalParabolaVariables]: LinkedVariable}, graphId: number) {
+    let { k, c, h } = variables; 
+    if (h instanceof LinkedVariable) h = h.value
+    if (c instanceof LinkedVariable) c = c.value
+    if (k instanceof LinkedVariable) k = k.value
     const d = Math.sign(c) / 4;
     const e = Math.sqrt(Math.abs(c));
     setVariable(`h_{${graphId}}`, h);

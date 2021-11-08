@@ -1,4 +1,5 @@
-import { GraphTypes, LatexExpression } from './lib'
+import { GraphTypes } from './lib'
+import { LatexExpression } from './types';
 
 export const defaultExpressionFormat: LatexExpression[] = [
   { latex: '\\left(x_{1cb},y_{1ca}+\\left(y_{1cb}-y_{1ca}\\right)t\\right)', types: ['segment', 'delete', 'hide', 'y'] },

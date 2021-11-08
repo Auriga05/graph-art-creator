@@ -1,13 +1,29 @@
+import { Bounds, GeneralConicVariables, NumberBounds } from './../types';
 import { Conic } from "../classes/Conic";
 import { Graph } from "../classes/Graph";
 import { xExpressions, yExpressions } from "../constants";
 import { MyCalc } from "../index.user";
-import { Expression, getVariable, LinkedVariable, substitute, getDomains, minMax, setVariable } from "../lib";
+import { getVariable, LinkedVariable, substitute, getDomains, minMax, setVariable, minLinkedVariable, maxLinkedVariable } from "../lib";
+import { Expression, InputBaseExpression } from "../types";
 
+export type LineSegmentVariables = {
+  m: number
+  b: number
+  x1: number
+  x2: number
+}
+
+export type LineSegmentData = {
+  graphType: 6
+  variables: LineSegmentVariables | {[Property in keyof LineSegmentVariables]: LinkedVariable}
+  bounds: Bounds
+}
 export class LineSegment extends Graph implements Initializable, Conic {
   static hasCenter = false;
   static hasCrop = false;
-  isConic = true;
+  static graphType = 6;
+  static isConic = true;
+  static hasGeneralForm = true;
   static expressionFormat = [ // Line Segment (x or y)
     { latex: 'y=m_{1}x+b_{1}\\left\\{x_{1ca}<x<x_{1cb}\\right\\}', types: ['graph'] },
     { latex: '\\left(x_{1a},y_{1a}\\right)', types: ['point', 'hide'] },
@@ -25,8 +41,16 @@ export class LineSegment extends Graph implements Initializable, Conic {
     { latex: 'y_{1ca}=m_{1}x_{1ca}+b_{1}', types: ['helper_var'] },
     { latex: 'y_{1cb}=m_{1}x_{1cb}+b_{1}', types: ['helper_var'] },
   ]
-  constructor(expression: Expression) {
+  constructor(expression: InputBaseExpression) {
     super(expression, 6);
+  }
+
+  static fromGeneral(variable: GeneralConicVariables) {
+    const {A, C, D, E, F} = variable
+    const m = D;
+    const b = F;
+  
+    return { m, b };
   }
 
   getGeneralForm() {
@@ -37,16 +61,20 @@ export class LineSegment extends Graph implements Initializable, Conic {
     const D = m;
     const E = 0;
     const F = b;
-    return { A, C, D, E, F };
+    return { A, B:0, C, D, E, F };
   }
 
   getConicVariables() {
     const { graphId } = this;
-    const x1 = MyCalc.linkedVariable(`x_{${graphId}ca}`);
-    const x2 = MyCalc.linkedVariable(`x_{${graphId}cb}`);
-    const y1 = MyCalc.linkedVariable(`y_{${graphId}ca}`);
-    const y2 = MyCalc.linkedVariable(`y_{${graphId}cb}`);
+    const x1 = MyCalc.linkedVariable(`x_{${graphId}a}`);
+    const x2 = MyCalc.linkedVariable(`x_{${graphId}b}`);
+    const y1 = MyCalc.linkedVariable(`y_{${graphId}a}`);
+    const y2 = MyCalc.linkedVariable(`y_{${graphId}b}`);
     return { x1, x2, y1, y2 };
+  }
+
+  getGraphVariables() {
+    return this.getConicVariables()
   }
 
   convertToStandard() {
@@ -80,20 +108,36 @@ export class LineSegment extends Graph implements Initializable, Conic {
     return relevantIndices;
   }
 
+  getRealBounds() {
+    const {x1, x2, y1, y2} = this.getGraphVariables()
+
+    const xMin = minLinkedVariable([x1, x2]);
+    const yMin = minLinkedVariable([y1, y2]);
+    const xMax = maxLinkedVariable([x1, x2]);
+    const yMax = maxLinkedVariable([y1, y2]);
+    return { xMin, yMin, xMax, yMax };
+  }
+
   
   static transformVariables(variables: number[]) {
     const [m, b, x1, x2] = variables;
     return {m, b, x1, x2}
   }
 
-  static setGraphVariables(variables: ReturnType<typeof LineSegment.transformVariables>, graphId: number) {
-    const { m, b, x1, x2 } = variables;
+  static setGraphVariables(variables: LineSegmentVariables | {[Property in keyof LineSegmentVariables]: LinkedVariable}, graphId: number) {
+    let { m, b, x1, x2 } = variables;
+    if (m instanceof LinkedVariable) m = m.value
+    if (b instanceof LinkedVariable) b = b.value
+    if (x1 instanceof LinkedVariable) x1 = x1.value
+    if (x2 instanceof LinkedVariable) x2 = x2.value
     const y1 = m * x1 + b;
     const y2 = m * x2 + b;
     setVariable(`x_{${graphId}a}`, x1.toString());
     setVariable(`y_{${graphId}a}`, y1.toString());
     setVariable(`x_{${graphId}b}`, x2.toString());
     setVariable(`y_{${graphId}b}`, y2.toString());
+    setVariable(`m_{${graphId}}`, m.toString());
+    setVariable(`b_{${graphId}}`, b.toString());
   }
   static setDefault(id: number, expressionPos: {x: number, y: number}, size: number) : void {
     setVariable(`x_{${id}a}`, expressionPos.x - size * 0.2);

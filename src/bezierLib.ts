@@ -1,43 +1,41 @@
+import { Coordinate } from './mathLib';
+
 function compareNum(a: number,b: number) {
-  if (a < b) return -1;
-  if (a > b) return 1;
-  return 0;
-}
+    if (a < b) return -1;
+    if (a > b) return 1;
+    return 0;
+  }
 
-export interface Coordinate {
-    x: number,
-    y: number
-}
-
+  
 function findInflectionPoints(
     p1: Coordinate,
     p2: Coordinate,
     p3: Coordinate,
     p4: Coordinate,
 ){
-  var ax = -p1.x + 3*p2.x - 3*p3.x + p4.x;
-  var bx = 3*p1.x - 6*p2.x + 3*p3.x;
-  var cx = -3*p1.x + 3*p2.x;
+  const ax = -p1.x + 3*p2.x - 3*p3.x + p4.x;
+  const bx = 3*p1.x - 6*p2.x + 3*p3.x;
+  const cx = -3*p1.x + 3*p2.x;
 
-  var ay = -p1.y + 3*p2.y - 3*p3.y + p4.y;
-  var by = 3*p1.y - 6*p2.y + 3*p3.y;
-  var cy = -3*p1.y + 3*p2.y;
-  var a = 3*(ay*bx-ax*by);
-  var b = 3*(ay*cx-ax*cy);
-  var c = by*cx-bx*cy;
-  var r2 = b*b - 4*a*c;
-  var firstIfp = 0;
-  var secondIfp = 0;
+  const ay = -p1.y + 3*p2.y - 3*p3.y + p4.y;
+  const by = 3*p1.y - 6*p2.y + 3*p3.y;
+  const cy = -3*p1.y + 3*p2.y;
+  const a = 3*(ay*bx-ax*by);
+  const b = 3*(ay*cx-ax*cy);
+  const c = by*cx-bx*cy;
+  const r2 = b*b - 4*a*c;
+  let firstIfp = 0;
+  let secondIfp = 0;
   if (r2>=0 && a!==0)
   {
-    var r = Math.sqrt(r2);
+    const r = Math.sqrt(r2);
     firstIfp = (-b + r) / (2*a);
     secondIfp = (-b - r) / (2*a);
     if ((firstIfp>0 && firstIfp<1) && (secondIfp>0 && secondIfp<1))
     {
       if (firstIfp>secondIfp)
       {
-        var tmp = firstIfp;
+        const tmp = firstIfp;
         firstIfp = secondIfp;
         secondIfp = tmp;
       }
@@ -63,7 +61,7 @@ export function getCriticalPoints(
     c2: Coordinate,
     p2: Coordinate,
 ){
-    var a = (c2.x - 2 * c1.x + p1.x) - (p2.x - 2 * c2.x + c1.x),
+    let a = (c2.x - 2 * c1.x + p1.x) - (p2.x - 2 * c2.x + c1.x),
     b = 2 * (c1.x - p1.x) - 2 * (c2.x - c1.x),
     c = p1.x - c1.x,
     t1 = (-b + Math.sqrt(b * b - 4 * a * c)) / 2 / a,
@@ -84,13 +82,13 @@ export function getCriticalPoints(
     if (t1 >= 0 && t1 <= 1 && tvalues.indexOf(t1)==-1) tvalues.push(t1);
     if (t2 >= 0 && t2 <= 1 && tvalues.indexOf(t2)==-1) tvalues.push(t2);
 
-    var inflectionpoints = findInflectionPoints(p1, c1, c2, p2);
+    const inflectionpoints = findInflectionPoints(p1, c1, c2, p2);
     if (inflectionpoints[0]) tvalues.push(inflectionpoints[0]);
     if (inflectionpoints[1]) tvalues.push(inflectionpoints[1]);
 
     tvalues.sort(compareNum);
     return tvalues;
-};
+}
 
 class CPoint {
     X: number
@@ -108,33 +106,25 @@ export function subdivideCubic(
     m_p4: Coordinate,
     t: number)
 {
-    var arg = arguments;
-    if (arg.length!=9) return [];
-    var p1p = new CPoint(m_p1.x + (m_p2.x - m_p1.x) * t,
-                        m_p1.y + (m_p2.y - m_p1.y) * t);
-    var p2p = new CPoint(m_p2.x + (m_p3.x - m_p2.x) * t,
-                        m_p2.y + (m_p3.y - m_p2.y) * t);
-    var p3p = new CPoint(m_p3.x + (m_p4.x - m_p3.x) * t,
-                        m_p3.y + (m_p4.y - m_p3.y) * t);
-    var p1d = new CPoint(p1p.X + (p2p.X - p1p.X) * t,
-                        p1p.Y + (p2p.Y - p1p.Y) * t);
-    var p2d = new CPoint(p2p.X + (p3p.X - p2p.X) * t,
-                        p2p.Y + (p3p.Y - p2p.Y) * t);
-    var p1t = new CPoint(p1d.X + (p2d.X - p1d.X) * t,
-                        p1d.Y + (p2d.Y - p1d.Y) * t);
+    const p1p = new CPoint(m_p1.x + (m_p2.x - m_p1.x) * t, m_p1.y + (m_p2.y - m_p1.y) * t);
+    const p2p = new CPoint(m_p2.x + (m_p3.x - m_p2.x) * t, m_p2.y + (m_p3.y - m_p2.y) * t);
+    const p3p = new CPoint(m_p3.x + (m_p4.x - m_p3.x) * t, m_p3.y + (m_p4.y - m_p3.y) * t);
+    const p1d = new CPoint(p1p.X + (p2p.X - p1p.X) * t, p1p.Y + (p2p.Y - p1p.Y) * t);
+    const p2d = new CPoint(p2p.X + (p3p.X - p2p.X) * t, p2p.Y + (p3p.Y - p2p.Y) * t);
+    const p1t = new CPoint(p1d.X + (p2d.X - p1d.X) * t, p1d.Y + (p2d.Y - p1d.Y) * t);
     return [[m_p1.x, m_p1.y, p1p.X, p1p.Y, p1d.X, p1d.Y, p1t.X, p1t.Y],
             [p1t.X, p1t.Y, p2d.X, p2d.Y, p3p.X, p3p.Y, m_p4.x, m_p4.y]];
 }
 
-function bezierMinMax(
+export function bezierMinMax(
     p1: Coordinate,
     p2: Coordinate,
     p3: Coordinate,
     p4: Coordinate
 ){
-    var tvalues = [], xvalues = [], yvalues = [],
-        a, b, c, t, t1, t2, b2ac, sqrtb2ac;
-    for (var i = 0; i < 2; ++i) {
+    const tvalues = [], xvalues = [], yvalues = []
+    let a, b, c, t, t1, t2, b2ac, sqrtb2ac;
+    for (let i = 0; i < 2; ++i) {
         if (i == 0) {
             b = 6 * p1.x - 12 * p2.x + 6 * p3.x;
             a = -3 * p1.x + 9 * p2.x - 9 * p3.x + 3 * p4.x;
@@ -175,7 +165,7 @@ function bezierMinMax(
         }
     }
   
-    var j = tvalues.length, mt;
+    let j = tvalues.length, mt;
     while (j--) {
         t = tvalues[j];
         mt = 1 - t;
@@ -190,4 +180,13 @@ function bezierMinMax(
         min: {x: Math.min.apply(0, xvalues), y: Math.min.apply(0, yvalues)},
         max: {x: Math.max.apply(0, xvalues), y: Math.max.apply(0, yvalues)}
     };
+}
+
+export function evaluateBezier(p1: Coordinate, p2: Coordinate, p3: Coordinate, p4: Coordinate, t: number) {
+    const x = p1.x * (1 - t) ** 3 + p2.x * 3 * t * (1 - t) ** 2 + p3.x * 3 * (1 - t) * t ** 2 + p4.x * t ** 3
+    const y = p1.y * (1 - t) ** 3 + p2.y * 3 * t * (1 - t) ** 2 + p3.y * 3 * (1 - t) * t ** 2 + p4.y * t ** 3
+    return {
+        x,
+        y,
+    }
 }
