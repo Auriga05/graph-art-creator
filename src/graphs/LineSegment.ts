@@ -1,10 +1,8 @@
-import { Bounds, GeneralConicVariables, NumberBounds } from './../types';
 import { Conic } from "../classes/Conic";
 import { Graph } from "../classes/Graph";
-import { xExpressions, yExpressions } from "../constants";
 import { MyCalc } from "../index.user";
-import { getVariable, LinkedVariable, substitute, getDomains, minMax, setVariable, minLinkedVariable, maxLinkedVariable } from "../lib";
-import { Expression, InputBaseExpression } from "../types";
+import { LinkedVariable, getVariable, substitute, getDomains, minMax, minLinkedVariable, maxLinkedVariable, setVariable } from "../lib/lib";
+import { Bounds, InputBaseExpression, GeneralConicVariables } from "../types/types";
 
 export type LineSegmentVariables = {
   m: number
@@ -24,6 +22,9 @@ export class LineSegment extends Graph implements Initializable, Conic {
   static graphType = 6;
   static isConic = true;
   static hasGeneralForm = true;
+  static xExpression = ['\\frac{\\left(y-b_{1}\\right)}{m_{1}}']
+  static yExpression = ['m_{1}x+b_{1}']
+  static graphTypeName = "line_segment"
   static expressionFormat = [ // Line Segment (x or y)
     { latex: 'y=m_{1}x+b_{1}\\left\\{x_{1ca}<x<x_{1cb}\\right\\}', types: ['graph'] },
     { latex: '\\left(x_{1a},y_{1a}\\right)', types: ['point', 'hide'] },
@@ -36,8 +37,8 @@ export class LineSegment extends Graph implements Initializable, Conic {
     { latex: 'y_{1b}=1', types: ['var'], name: 'yb' },
     { latex: 'x_{1a}=0', types: ['var'], name: 'xa' },
     { latex: 'x_{1b}=1', types: ['var'], name: 'xb' },
-    ...yExpressions[6].map((yExpression, c) => ({ latex: `f_{1y${String.fromCharCode(97 + c)}}(x)=${yExpression}`, types: ['y_expression'], name: `f_{1y${String.fromCharCode(97 + c)}}` })),
-    ...xExpressions[6].map((xExpression, c) => ({ latex: `f_{1x${String.fromCharCode(97 + c)}}(y)=${xExpression}`, types: ['x_expression'], name: `f_{1x${String.fromCharCode(97 + c)}}` })),
+    ...LineSegment.yExpression.map((yExpression, c) => ({ latex: `f_{1y${String.fromCharCode(97 + c)}}(x)=${yExpression}`, types: ['y_expression'], name: `f_{1y${String.fromCharCode(97 + c)}}` })),
+    ...LineSegment.xExpression.map((xExpression, c) => ({ latex: `f_{1x${String.fromCharCode(97 + c)}}(y)=${xExpression}`, types: ['x_expression'], name: `f_{1x${String.fromCharCode(97 + c)}}` })),
     { latex: 'y_{1ca}=m_{1}x_{1ca}+b_{1}', types: ['helper_var'] },
     { latex: 'y_{1cb}=m_{1}x_{1cb}+b_{1}', types: ['helper_var'] },
   ]

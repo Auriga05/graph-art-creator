@@ -1,26 +1,10 @@
-import { IdParts, GraphingOptions, Bounds, EditableIdParts } from './types';
-// ==UserScript==
-// @name         Precal thing
-// @namespace    http://tampermonkey.net/
-// @version      0.1.2
-// @description  precal thing
-// @author       You (not Watanabe)
-// @match        https://www.desmos.com/calculator*
-// @icon         https://www.google.com/s2/favicons?domain=desmos.com
-// @grant        unsafeWindow
-// @updateURL    https://github.com/Auriga05/graph-art-creator/raw/master/index.user.js
-// @downloadURL  https://github.com/Auriga05/graph-art-creator/raw/master/index.user.js
-// @require      https://code.jquery.com/jquery-3.5.1.slim.min.js
-// @require      https://cdn.jsdelivr.net/npm/evaluatex@2.2.0/dist/evaluatex.min.js
-// ==/UserScript==
-
-import { LinkedVariable, getGraphType, parseDomains, simplify, generateBounds, substituteParenthesis, substituteFromId, setVariable, GraphTypes, createGraphObject, doesIntersect, typeFilter, createConic, createBezier, toId, transformBezier, getDomainsFromLatex, isBaseExpression, createLineSegment, getIdParts, functionRegex} from './lib'
-import { Graph } from './classes/Graph'
-import { MyCalcClass } from './MyCalc';
-import { BaseExpression, Expression, InputBaseExpression, MinBaseExpression, NumberBounds } from './types';
-import { CalcType } from './desmosTypes';
-import { finalize, finalizeId, unfinalize } from './actions/finalize';
-import { hideCropLines } from './actions/hideCropLines';
+import { finalizeId, unfinalize, finalize } from "./actions/finalize";
+import { hideCropLines } from "./actions/hideCropLines";
+import { Graph } from "./classes/Graph";
+import { MyCalcClass } from "./classes/MyCalc";
+import { LinkedVariable, setVariable, generateBounds, createGraphObject, doesIntersect, functionRegex, toId, simplify, createConic, isBaseExpression, substituteParenthesis, typeFilter, getIdParts, transformBezier, createLineSegment, createBezier } from "./lib/lib";
+import { CalcType } from "./types/desmosTypes";
+import { Expression, NumberBounds, Bounds, GraphingOptions, InputBaseExpression, BaseExpression, IdParts, GraphTypeIdToName, GraphTypeNames, GraphTypesByName } from "./types/types";
 
 interface SelectionObject {
   id: string
@@ -49,7 +33,7 @@ function isGraph(expression: Expression) {
 
 export let MyCalc: MyCalcClass;
 
-export function createGraphWithBounds(graphId: number, graphType: number, variables: any, _bounds: NumberBounds | Bounds, options?: GraphingOptions) {
+export function createGraphWithBounds(graphId: number, graphType: GraphTypeNames, variables: any, _bounds: NumberBounds | Bounds, options?: GraphingOptions) {
   const logical = !!options?.logical
   let xMin = _bounds.xMin instanceof LinkedVariable ? _bounds.xMin.value : _bounds.xMin
   let yMin = _bounds.yMin instanceof LinkedVariable ? _bounds.yMin.value : _bounds.yMin
@@ -66,11 +50,12 @@ export function createGraphWithBounds(graphId: number, graphType: number, variab
   let h = 0;
   let k = 0;
 
-  const graphFormat = GraphTypes[graphType].expressionFormat;
+  const graphFormat = GraphTypesByName[graphType].expressionFormat;
   const expressionsToSet = [];
 
-  GraphTypes[graphType].setGraphVariables(variables, graphId)
-  if (GraphTypes[graphType].hasCenter) {
+  const Class = GraphTypesByName[graphType]
+  Class.setGraphVariables(variables, graphId)
+  if (Class.hasCenter) {
     ({h, k} = variables);
     setVariable(`x_{${graphId}cam}`, (xMin - h).toString());
     setVariable(`y_{${graphId}cam}`, (yMin - k).toString());
@@ -85,7 +70,7 @@ export function createGraphWithBounds(graphId: number, graphType: number, variab
     const newExpression = graphFormat[0]
     let newExpressionLatex = newExpression.latex;
     newExpressionLatex = newExpressionLatex.replaceAll('_{1', `_{${graphId}`);
-    if (GraphTypes[graphType].hasCenter) {
+    if (Class.hasCenter) {
       newExpressionLatex += generateBounds(
         MyCalc.linkedVariable(`x_{${graphId}ca}`, xMin),
         MyCalc.linkedVariable(`y_{${graphId}ca}`, yMin),
@@ -119,7 +104,7 @@ export function createGraphWithBounds(graphId: number, graphType: number, variab
           }
         }
       })
-    if (GraphTypes[graphType].hasCrop) {
+    if (Class.hasCrop) {
       const bounds = graphObject.getRealBounds();
       if (!Number.isFinite(xMin)) {
         xMin = bounds.xMin.value - 2;
@@ -160,7 +145,7 @@ export function createGraphWithBounds(graphId: number, graphType: number, variab
         newExpressionLatex = `${variable}=${simplify(parseFloat(value), 4)}`;
       }
       let label = ""
-      if (graphType !== 6) {
+      if (graphType !== "line_segment") {
         if (i === 0) {
           label = JSON.stringify({
             graphType
@@ -262,7 +247,7 @@ function main() {
   let ctrlTime = 0;
   let expressionPos = { x: 0, y: 0 };
   let shadeId = 1;
-  let currGraphId = 0;
+  let currGraphName: GraphTypeNames = "circle";
   let centerPoint = {
     x: Infinity,
     y: Infinity,
@@ -294,18 +279,19 @@ function main() {
     },
   };
 
-  function createDefaultConic(graphType: number) {
+  function createDefaultConic(graphType: GraphTypeNames) {
+    const Class = GraphTypesByName[graphType]
     const coordinates = MyCalc.graphpaperBounds.mathCoordinates;
     expressionPos = { x: parseFloat(((coordinates.left + coordinates.right) / 2).toFixed(MyCalc.precision)), y: parseFloat(((coordinates.top + coordinates.bottom) / 2).toFixed(MyCalc.precision)) };
     const verticalSize = (coordinates.top - coordinates.bottom);
     const horizontalSize = (coordinates.right - coordinates.left);
     const size = Math.min(verticalSize, horizontalSize);
-    GraphTypes[graphType].setDefault(MyCalc.globalId, expressionPos, size)
-    if (GraphTypes[graphType].hasCenter) {
+    Class.setDefault(MyCalc.globalId, expressionPos, size)
+    if (Class.hasCenter) {
       setVariable(`h_{${MyCalc.globalId}}`, expressionPos.x);
       setVariable(`k_{${MyCalc.globalId}}`, expressionPos.y);
     }
-    if (GraphTypes[graphType].hasCrop) {
+    if (Class.hasCrop) {
       setVariable(`x_{${MyCalc.globalId}cam}`, -size * 0.4);
       setVariable(`y_{${MyCalc.globalId}cam}`, -size * 0.4);
       setVariable(`x_{${MyCalc.globalId}cbm}`, size * 0.4);
@@ -587,7 +573,7 @@ function main() {
       } else if (keyCode === 187) {
         toggleShading();
       } else if ((keyCode >= 49) && (keyCode <= 56)) {
-        createDefaultConic(keyCode - 49);
+        createDefaultConic(GraphTypeIdToName[keyCode - 49]);
       } else if (keyCode === 83) { // bottom
         resetSelection();
       } else if (keyCode === 48) {
@@ -797,11 +783,12 @@ function main() {
           createLineSegment(easySelections[0], easySelections[1], MyCalc.globalId, {finalize: true})
         }
         if (easySelections.length === 4) {
-          createBezier(
-            easySelections[0],
-            easySelections[1],
-            easySelections[2],
-            easySelections[3],
+          createBezier({
+            p1: easySelections[0],
+            p2: easySelections[1],
+            p3: easySelections[2],
+            p4: easySelections[3],
+          },
             MyCalc.globalId
           )
           // MyCalc.regression(easySelections)
@@ -898,15 +885,17 @@ function main() {
   }
 
   function changegraphType() {
-    currGraphId = (currGraphId + 1) % 7;
+    // currGraphId = (currGraphId + 1) % 7;
+    currGraphName = "circle"
     const button = document.querySelector('#artist-button');
     if (button) {
-      button.innerHTML = graphAbbrev[currGraphId];
+      // button.innerHTML = graphAbbrev[currGraphId];
+      button.innerHTML = "circle"
     }
   }
 
   function createConicHandler() {
-    createDefaultConic(currGraphId);
+    createDefaultConic(currGraphName);
   }
 
   const shortcutButtons = false
@@ -918,7 +907,7 @@ function main() {
     const artistContainer = unsafeWindow.document.querySelector('#artist-container');
     if (shortcutButtons) {
       if (artistContainer) {
-        artistContainer.insertAdjacentHTML('beforeend', `<div class="dcg-tooltip-hit-area-container dcg-hovered"> <div id="artist-button" class="dcg-btn-flat-gray dcg-settings-pillbox dcg-action-settings dcg-hovered" role="button" oncontextmenu="createConicHandler();return false;" onclick="changegraphType()" style="background:#ededed">${graphAbbrev[currGraphId]}</div></div>`);
+        artistContainer.insertAdjacentHTML('beforeend', `<div class="dcg-tooltip-hit-area-container dcg-hovered"> <div id="artist-button" class="dcg-btn-flat-gray dcg-settings-pillbox dcg-action-settings dcg-hovered" role="button" oncontextmenu="createConicHandler();return false;" onclick="changegraphType()" style="background:#ededed">${"circle" /* graphAbbrev[currGraphId] */}</div></div>`);
         artistContainer.insertAdjacentHTML('beforeend', '<div class="dcg-tooltip-hit-area-container dcg-hovered"> <div class="dcg-btn-flat-gray dcg-settings-pillbox dcg-action-settings dcg-hovered" role="button" onclick="deleteById(Calc.selectedExpressionId)" style="background:#ededed">X</div></div>');
         artistContainer.insertAdjacentHTML('beforeend', '<div class="dcg-tooltip-hit-area-container dcg-hovered"> <div class="dcg-btn-flat-gray dcg-settings-pillbox dcg-action-settings dcg-hovered" role="button" onclick="hideCropLines(Calc.selectedExpressionId)" style="background:#ededed">H</div></div>');
         artistContainer.insertAdjacentHTML('beforeend', '<div class="dcg-tooltip-hit-area-container dcg-hovered"> <div class="dcg-btn-flat-gray dcg-settings-pillbox dcg-action-settings dcg-hovered" role="button" onclick="changeCropMode(Calc.selectedExpressionId)" style="background:#ededed">Q</div></div>');

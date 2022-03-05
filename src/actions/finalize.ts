@@ -1,6 +1,6 @@
-import { EditableIdParts, FinalIdParts, IdParts, InvalidIdParts, GraphingOptions } from './../types';
 import { MyCalc, createGraphWithBounds } from "../index.user";
-import { createGraphObject, getDomainsFromLatex, isBaseExpression, parseDomains, substituteFromId, substituteToAll, usesVariable } from "../lib";
+import { isBaseExpression, parseDomains, getDomainsFromLatex, substituteFromId, createGraphObject, substituteToAll } from "../lib/lib";
+import { InvalidIdParts, FinalIdParts, GraphingOptions, EditableIdParts, IdParts, GraphTypeIdToName } from "../types/types";
 import { convertFromStandard } from "./convertFromStandard";
 
 function unfinalizeConvert(id: InvalidIdParts) {
@@ -23,17 +23,17 @@ function unfinalizeConvert(id: InvalidIdParts) {
         const yMin = Math.max(-Infinity, _yMin);
         const yMax = Math.min(k, _yMax);
         if (b < 0) { // horizontal hyperbola
-          createGraphWithBounds(MyCalc.globalId, 4, { h, a: Math.sqrt(Math.abs(b2)), k, b: Math.sqrt(Math.abs(a2)) }, { xMin, xMax, yMin, yMax });
+          createGraphWithBounds(MyCalc.globalId, "horizontal_hyperbola", { h, a: Math.sqrt(Math.abs(b2)), k, b: Math.sqrt(Math.abs(a2)) }, { xMin, xMax, yMin, yMax });
         } else if (b > 0) { // vertical hyperbola
-          createGraphWithBounds(MyCalc.globalId, 5, { h, a: Math.sqrt(Math.abs(a2)), k, b: Math.sqrt(Math.abs(b2)) }, { xMin, xMax, yMin, yMax });
+          createGraphWithBounds(MyCalc.globalId, "vertical_hyperbola", { h, a: Math.sqrt(Math.abs(a2)), k, b: Math.sqrt(Math.abs(b2)) }, { xMin, xMax, yMin, yMax });
         }
       } else if (a > 0) { // up
         const yMin = Math.max(k, _yMin);
         const yMax = Math.min(Infinity, _yMax);
         if (b < 0) { // horizontal hyperbola
-          createGraphWithBounds(MyCalc.globalId, 4, { h, a: Math.sqrt(Math.abs(b2)), k, b: Math.sqrt(Math.abs(a2)) }, { xMin, xMax, yMin, yMax });
+          createGraphWithBounds(MyCalc.globalId, "horizontal_hyperbola", { h, a: Math.sqrt(Math.abs(b2)), k, b: Math.sqrt(Math.abs(a2)) }, { xMin, xMax, yMin, yMax });
         } else if (b > 0) { // vertical parabola
-          createGraphWithBounds(MyCalc.globalId, 5, { h, a: Math.sqrt(Math.abs(a2)), k, b: Math.sqrt(Math.abs(b2)) }, { xMin, xMax, yMin, yMax });
+          createGraphWithBounds(MyCalc.globalId, "vertical_hyperbola", { h, a: Math.sqrt(Math.abs(a2)), k, b: Math.sqrt(Math.abs(b2)) }, { xMin, xMax, yMin, yMax });
         }
       }
     }

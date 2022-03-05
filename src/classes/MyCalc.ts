@@ -1,67 +1,32 @@
-import { Coordinate } from './mathLib';
-import { createGraphObject, functionRegex, getDomainsFromLatex, getGraphType, getIdParts, getVariable, getVariablesNeeded, GraphTypes, hax, isBaseExpression, isFinal, LinkedVariable, parseDomains, substitute, substituteFromId, substituteToAll, transformBezier, usesVariable } from "./lib";
-import { parse } from 'svg-parser'
-import { parseSVG, makeAbsolute, Command, CommandMadeAbsolute } from "svg-path-parser"
-import { createGraphWithBounds } from "./index.user";
-import { CalcType, ControllerType, State } from "./desmosTypes";
-import { BaseExpression, Expression, GeneralConicVariables, InputBaseExpression, MinBaseExpression, TableExpression } from "./types";
-import { finalize, finalizeId, unfinalize } from "./actions/finalize";
-import { Bezier } from "./graphs/Bezier";
-import { getGraphTypeFromStandard } from './actions/convertFromStandard';
-import { hideCropLines } from './actions/hideCropLines';
-import { Graph } from './classes/Graph';
+import { getGraphTypeFromStandard } from "../actions/convertFromStandard"
+import { unfinalize, finalize } from "../actions/finalize"
+import { hideCropLines } from "../actions/hideCropLines"
+import { Bezier } from "../graphs/Bezier"
+import { LinkedVariable, isBaseExpression, getIdParts, isFinal, functionRegex, createGraphObject, substituteToAll, getVariablesNeeded, transformBezier, substituteFromId, usesVariable } from "../lib/lib"
+import { CalcType, ControllerType, State } from "../types/desmosTypes"
+import { Expression, InputBaseExpression, TableExpression, MinBaseExpression, BaseExpression } from "../types/types"
+import { HaxProcessor } from "./HaxProcessor"
+import { VirtualCalc } from "./VirtualCalc"
+
 export class MyCalcClass {
   Calc: CalcType
-
   Controller: ControllerType
-
   linkedVariables: {[key: string]: LinkedVariable}
-
   usedId: Set<number>
-
   logicalExpressions: {[key: string]: Expression}
-
   globalVariablesObject: {[key: string]: string}
-
   globalFunctionsObject: {[key: string]: {id: string, args: string[], definition: string}}
-  
   expressionsToRemove: {beforeRemove: string, expressions: Expression[]}[]
-
-  lastControlPoint: {
-    cubic: Coordinate
-    quadratic: Coordinate
-  }
-  
-  paths: {
-    command: CommandMadeAbsolute,
-    details: {
-      dx: number,
-      dy: number,
-      color: string,
-      isStart: boolean,
-    }
-  }[]
-
-  haxIndex: number
-
   globalId: number
-
   isProcessing: boolean
-
   toFinalizeId: Set<string>
-
   isProcessingFinalize: boolean
-
-  haxOnTick: boolean
-
   minRes: number
-
   doneLines: Set<string>
-
   precision: number
-
   existingExpressions: Set<string>
-
+  haxProcessor: HaxProcessor
+  virtualCalc: VirtualCalc
   constructor(_Calc: CalcType) {
     this.Calc = _Calc;
     this.Controller = _Calc.controller;
@@ -71,21 +36,16 @@ export class MyCalcClass {
     this.globalFunctionsObject = {}
     this.linkedVariables = {}
     this.expressionsToRemove = []
-    this.paths = []
-    this.haxIndex = 0
     this.globalId = 1
     this.isProcessing = false
     this.toFinalizeId = new Set<string>()
     this.isProcessingFinalize = false
-    this.haxOnTick = false
     this.minRes = 0
     this.doneLines = new Set<string>()
     this.existingExpressions = new Set<string>()
     this.precision = 6;
-    this.lastControlPoint = {
-      cubic: { x: 0, y: 0 },
-      quadratic: { x: 0, y: 0 },
-    }
+    this.haxProcessor = new HaxProcessor()
+    this.virtualCalc = new VirtualCalc()
     this.update();
     this.init()
   }
@@ -275,9 +235,7 @@ export class MyCalcClass {
   }
 
   tick(this: MyCalcClass) {
-    if (this.haxOnTick) {
-      this.nextHax()
-    }
+    this.haxProcessor.tick()
     // this.updateVariables()
     if (this.expressionsToRemove && !this.isProcessing) {
       this.isProcessing = true
@@ -366,7 +324,7 @@ export class MyCalcClass {
   }
 
   setExpressions(expressions: Expression[]) {
-    const expressionsToBeCreated: Partial<Expression>[] = []
+    const expressionsToBeCreated: Expression[] = []
     expressions.forEach((expression) => {
       if (expression.id) {
         if (this.getExpression(expression.id)) {
@@ -376,6 +334,7 @@ export class MyCalcClass {
         }
       }
     })
+    this.virtualCalc.setExpressions(expressionsToBeCreated)
     this.Calc.setExpressions(expressionsToBeCreated);
   }
 
@@ -388,6 +347,7 @@ export class MyCalcClass {
         throw Error("Tried to update non-existent expression")
       }
     })
+    this.virtualCalc.setExpressions(expressionsToBeUpdated)
     this.Calc.setExpressions(expressionsToBeUpdated);
   }
 
@@ -591,75 +551,5 @@ export class MyCalcClass {
         }
       }
     }
-  }
-
-  consoleSVG(n: number) {
-    console.log(this.paths[n])
-  }
-  
-  hax(n: number) {
-    hax(this.paths[n])
-  }
-
-  nextHax() {
-    if (this.haxIndex < this.paths.length) {
-      hax(this.paths[this.haxIndex])
-      this.haxIndex += 1
-    } else {
-      this.haxOnTick = false
-    }
-  }
-
-  xhr () {
-    const url = "http://localhost:8010/proxy/attachments/831873240694652948/906153339161554944/feather.svg"
-    let paths: {d: string, style?: string, transform?: string}[] = []
-    fetch(url)
-      .then( r => r.text() )
-      .then( t => {
-        const svg = parse(t)
-        const child1 = svg.children[0]
-        if (child1.type === "element") {
-          const child2 = child1.children[0]
-          if (typeof child2 !== "string") {
-            if (child2.type === "element") {
-              paths = child2.children.map(child => {
-                if (typeof child !== "string") {
-                  if (child.type === "element") {
-                    return child.properties as any
-                  }
-                }
-              })
-            }
-          }
-        }
-        this.paths = []
-        paths.forEach((path) => {
-          let transform = ""
-          let _dx = "0"
-          let _dy = "0"
-
-          let style = ""
-          let color = "#000000"
-          if (path.transform) {
-            [transform, _dx, _dy] = [...path.transform.matchAll(/translate\((-?\d+(?:.\d+)?) (-?\d+(?:.\d+)?)\)/g)][0]
-          }
-          if (path.style) {
-            [style, color] = [...path.style.matchAll(/fill: (#[0-9a-f]{6})/g)][0]
-          }
-          const commands = makeAbsolute(parseSVG(path.d))
-          const newCommands = commands.map((_command, index) => {
-            return {
-              command: _command,
-              details: {
-                dx: parseFloat(_dx),
-                dy: parseFloat(_dy),
-                color,
-                isStart: index === 0
-              }
-            }
-          })
-          this.paths.push(...newCommands)
-        })
-      })
   }
 }

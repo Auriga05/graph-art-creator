@@ -1,34 +1,11 @@
-import { Coordinate } from './mathLib';
-import { Graph } from "./classes/Graph";
-import { createGraphWithBounds, MyCalc } from "./index.user";
-import { Circle } from './graphs/Circle'
-import { Ellipse } from './graphs/Ellipse';
-import { HorizontalHyperbola } from './graphs/HorizontalHyperbola';
-import { HorizontalParabola } from './graphs/HorizontalParabola';
-import { LineSegment } from './graphs/LineSegment';
-import { VerticalHyperbola } from './graphs/VerticalHyperbola';
-import { VerticalParabola } from './graphs/VerticalParabola';
-import { Conic } from "./classes/Conic";
-import { bezierMinMax, evaluateBezier, getCriticalPoints } from "./bezierLib";
-import { Bezier } from "./graphs/Bezier";
-import { Command, CommandMadeAbsolute, makeAbsolute, parseSVG } from "svg-path-parser";
-import { svgArcToCenterParam } from "./svgLib";
-import { BaseExpression, EditableIdParts, Expression, FinalIdParts, GraphingOptions, IdParts, InputBaseExpression, InvalidIdParts, MinBaseExpression, ShadeIdParts, TableExpression } from "./types";
-import { getConicFit } from './conicLib';
-import { getGraphTypeFromStandard } from './actions/convertFromStandard';
- 
-export const GraphTypes = [
-  Circle,
-  HorizontalParabola,
-  VerticalParabola,
-  Ellipse,
-  HorizontalHyperbola,
-  VerticalHyperbola,
-  LineSegment,
-  Bezier,
-]
+import { getGraphTypeFromStandard } from "../actions/convertFromStandard";
+import { Bezier } from "../graphs/Bezier";
+import { createGraphWithBounds, MyCalc } from "../index.user";
+import { BaseExpression, EditableIdParts, Expression, FinalIdParts, GraphingOptions, GraphTypeNames, GraphTypes, GraphTypesByName, IdParts, InputBaseExpression, InvalidIdParts, MinBaseExpression, ShadeIdParts } from "../types/types";
+import { evaluateBezier, getCriticalPoints } from "./bezierLib";
+import { getConicFit } from "./conicLib";
+import { Coordinate } from "./mathLib";
 
-export const baseExpressionFormat: string[] = GraphTypes.map(graphClass => graphClass.expressionFormat[0].latex);
 export type EvaluatexType = (equation: string, variables ? : {
   [key: string]: number
 }) =>
@@ -229,8 +206,8 @@ export function getGraphType(expression: MinBaseExpression) {
     return getGraphTypeFromStandard(expression.latex)
   } else if (id.isEditable) {
     let type = null;
-    for (let i = 0; i < baseExpressionFormat.length; i++) {
-      const currExpressionFormat = baseExpressionFormat[i];
+    for (let i = 0; i < GraphTypes.length; i++) {
+      const currExpressionFormat = GraphTypes[i].expressionFormat[0].latex;
       const newExpression = currExpressionFormat.replaceAll('_{1', `_{${id.graphId}`);
       if (expression.latex.includes(newExpression)) {
         type = i;
@@ -424,6 +401,9 @@ export function setVariable(variable: string, _value: string | number | LinkedVa
   } else if (value == undefined) {
     throw Error('undefined bruh what')
   }
+  MyCalc.virtualCalc.setVariables([
+    {key: variable, value}
+  ])
   MyCalc.globalVariablesObject[variable] = value;
 }
 
@@ -468,8 +448,8 @@ export function createGraphObject(expression: InputBaseExpression) {
   throw Error('Tried to convert a graph object from a non-curve object')
 }
 
-export function createConic(graphType: number, id: number, options?: GraphingOptions) {
-  const expression = GraphTypes[graphType].expressionFormat;
+export function createConic(graphType: GraphTypeNames, id: number, options?: GraphingOptions) {
+  const expression = GraphTypesByName[graphType].expressionFormat;
   const expressionsToSet = [];
   const willHide = ['x_expression', 'y_expression', 'hidden']
   if (options) {
@@ -484,7 +464,7 @@ export function createConic(graphType: number, id: number, options?: GraphingOpt
     const newExpression = expression[i];
     let newExpressionLatex = newExpression.latex;
     if (i === 0) {
-      if (GraphTypes[graphType].hasCrop) {
+      if (GraphTypesByName[graphType].hasCrop) {
         newExpressionLatex += '\\left\\{x_{1ca}<x<x_{1cb}\\right\\}\\left\\{y_{1ca}<y<y_{1cb}\\right\\}';
       }
     }
@@ -527,6 +507,64 @@ export function createConic(graphType: number, id: number, options?: GraphingOpt
   MyCalc.newGraph(id, expressionsToSet);
 }
 
+type StandardFormVariables = {
+  A: number
+  B: number
+  C: number
+  D: number
+  E: number
+  F: number
+}
+
+function getGraphTypeByVariables(variables: StandardFormVariables): GraphTypeNames {
+  const {A, B, C, D, E, F} = variables
+  let graphType = 0
+  if (A > 0) {
+    if (C > 0) {
+      if (A === C) { // Circle
+        graphType = 0
+      } else { // Ellipse
+        graphType = 3
+      }
+    } else if (C === 0) { // Vertical Parabola
+      graphType = 2
+    } else if (C < 0) { // Hyperbola
+      const delta = A * (C * D ** 2 + A * E ** 2 - 4 * A * C * F)
+      if (delta < 0) {
+        graphType = 4
+      } else {
+        graphType = 5
+      }
+    }
+  } else if ( A === 0 ) {
+    if (C > 0) {  // Horizontal Parabola
+      graphType = 1
+    } else if (C === 0) {  // Line
+      graphType = 6
+    } else if (C < 0) {  // Horizontal Parabola
+      graphType = 1            
+    }                  
+  } else if ( A < 0 ) {
+    if (C > 0) {  // Hyperbola
+      const delta = A * (C * D ** 2 + A * E ** 2 - 4 * A * C * F)
+      if (delta < 0) {
+        graphType = 4
+      } else {
+        graphType = 5
+      }
+    } else if (C === 0) {  // Vertical Parabola
+      graphType = 2
+    } else if (C < 0) {
+      if (A === C) { // Circle
+        graphType = 0
+      } else { // Ellipse
+      }
+      graphType = 3
+    }
+  }
+  return GraphTypes[graphType].graphTypeName as GraphTypeNames
+}
+
 // createLineSegment(p1, p2, startId, {finalize: true})
 export function createLineSegment(p1: Coordinate, p2: Coordinate, id: number, options?: GraphingOptions) {
   if (options?.finalize) {
@@ -558,13 +596,16 @@ export function createLineSegment(p1: Coordinate, p2: Coordinate, id: number, op
 }
 
 export function createBezier(
-  p1: Coordinate,
-  p2: Coordinate,
-  p3: Coordinate,
-  p4: Coordinate,
+  coordinates: {
+    p1: Coordinate,
+    p2: Coordinate,
+    p3: Coordinate,
+    p4: Coordinate,
+  },
   id: number,
   options?: GraphingOptions,
 ){
+  const {p1, p2, p3, p4} = coordinates
   Bezier.setGraphVariables({
     xa: p1.x,
     ya: p1.y,
@@ -603,52 +644,8 @@ export function createBezier(
         yMax: Math.max(...tPoints.y),
       }
       const variables = getConicFit(_tPoints)
-      const {A, B, C, D, E, F} = variables
-      let graphType = 0
-      if (A > 0) {
-        if (C > 0) {
-          if (A === C) { // Circle
-            graphType = 0
-          } else { // Ellipse
-            graphType = 3
-          }
-        } else if (C === 0) { // Vertical Parabola
-          graphType = 2
-        } else if (C < 0) { // Hyperbola
-          const delta = A * (C * D ** 2 + A * E ** 2 - 4 * A * C * F)
-          if (delta < 0) {
-            graphType = 4
-          } else {
-            graphType = 5
-          }
-        }
-      } else if ( A === 0 ) {
-        if (C > 0) {  // Horizontal Parabola
-          graphType = 1
-        } else if (C === 0) {  // Line
-          graphType = 6
-        } else if (C < 0) {  // Horizontal Parabola
-          graphType = 1            
-        }                  
-      } else if ( A < 0 ) {
-        if (C > 0) {  // Hyperbola
-          const delta = A * (C * D ** 2 + A * E ** 2 - 4 * A * C * F)
-          if (delta < 0) {
-            graphType = 4
-          } else {
-            graphType = 5
-          }
-        } else if (C === 0) {  // Vertical Parabola
-          graphType = 2
-        } else if (C < 0) {
-          if (A === C) { // Circle
-            graphType = 0
-          } else { // Ellipse
-          }
-          graphType = 3
-        }
-      }
-      const Class = GraphTypes[graphType]
+      const graphType = getGraphTypeByVariables(variables)
+      const Class = GraphTypesByName[graphType]
       const newVar = Class.fromGeneral(variables)
       if (newVar) {
         Class.setGraphVariables(newVar as any, MyCalc.globalId)
@@ -656,7 +653,7 @@ export function createBezier(
           if ((minMax.yMax - minMax.yMin < MyCalc.minRes) && (minMax.xMax - minMax.xMin < MyCalc.minRes)) {
             console.log('bounds smaller than minres')
           } else {
-            if (graphType === 4 || graphType === 5) {
+            if (graphType === "horizontal_hyperbola" || graphType === "vertical_hyperbola") {
               if ((newVar as any).a < MyCalc.minRes ** 2 && (newVar as any).b < MyCalc.minRes ** 2) {
                 console.log('hypersmall')
               } else {
@@ -674,7 +671,7 @@ export function createBezier(
       }
     }
   } else {
-    createConic(7, id, options)
+    createConic("bezier", id, options)
   }
 }
 
@@ -684,239 +681,12 @@ export function getDomainsFromLatex(latex: string) {
   ].map((domain) => domain[1]);
 }
 
-export function transformVariables(graphType: number, variables: number[]) {
-  return GraphTypes[graphType].transformVariables(variables)
+export function transformVariables(graphType: GraphTypeNames, variables: number[]) {
+  return GraphTypesByName[graphType].transformVariables(variables)
 }
 
-function dist(a: Coordinate, b: Coordinate) {
+export function dist(a: Coordinate, b: Coordinate) {
   return Math.sqrt((a.x - b.x) ** 2 + (a.y - b.y) ** 2)
-}
-export function hax(_paths: {
-  command: CommandMadeAbsolute,
-  details: {
-    dx: number,
-    dy: number,
-    color: string,
-    isStart: boolean,
-  }
-}) {
-  let startId = MyCalc.globalId;
-  const paths = _paths
-  const stroke = paths.command
-  const {dx, dy, color} = paths.details
-  let startPos;
-  if (startId !== 1) {
-    // finalize(`${startId - 1}_0`, startId - 1)
-  }
-  if (stroke.command === 'moveto') {
-    if (paths.details.isStart) {
-      startPos = {
-        x: stroke.x,
-        y: -stroke.y,
-      }
-    }
-  } else if (stroke.command === 'horizontal lineto' || stroke.command === 'vertical lineto' || stroke.command === 'lineto') {
-    const p1 = {x: stroke.x0 + dx, y: -stroke.y0 - dy}
-    const p2 = {x: stroke.x + dx, y: -stroke.y - dy}
-    if (dist(p1, p2) > MyCalc.minRes) {
-      const defArray = [
-        Math.floor(p1.x / MyCalc.minRes),
-        Math.floor(p1.y / MyCalc.minRes),
-        Math.floor(p2.x / MyCalc.minRes),
-        Math.floor(p2.y / MyCalc.minRes)
-      ].sort().toString()
-      if (!MyCalc.doneLines.has(defArray)) {
-        MyCalc.doneLines.add(defArray)
-        createLineSegment(p1, p2, startId, {finalize: true})
-      } else {
-        console.log('skip')
-      }
-    }
-    MyCalc.lastControlPoint.cubic = { x: 0, y: 0 }
-    MyCalc.lastControlPoint.quadratic = { x: 0, y: 0 }
-  } else if (stroke.command === 'curveto') {
-    const p0 = {x: stroke.x0 + dx, y: -stroke.y0 - dy}
-    const p1 = {x: stroke.x1 + dx, y: -stroke.y1 - dy}
-    const p2 = {x: stroke.x2 + dx, y: -stroke.y2 - dy}
-    MyCalc.lastControlPoint.cubic = p2
-    MyCalc.lastControlPoint.quadratic = { x: 0, y: 0 }
-    const p3 = {x: stroke.x + dx, y: -stroke.y - dy}
-    const minMax = bezierMinMax(p0, p1, p2, p3)
-    if ((minMax.max.y - minMax.min.y < MyCalc.minRes) && (minMax.max.x - minMax.min.x < MyCalc.minRes)) {
-    } else {
-      const defArray = [
-        Math.floor(p0.x / MyCalc.minRes),
-        Math.floor(p1.x / MyCalc.minRes),
-        Math.floor(p1.x / MyCalc.minRes),
-        Math.floor(p1.y / MyCalc.minRes),
-        Math.floor(p2.x / MyCalc.minRes),
-        Math.floor(p2.y / MyCalc.minRes),
-        Math.floor(p3.x / MyCalc.minRes),
-        Math.floor(p3.y / MyCalc.minRes),
-      ].sort().toString()
-      if (!MyCalc.doneLines.has(defArray)) {
-        MyCalc.doneLines.add(defArray)
-        createBezier(p0, p1, p2, p3, startId, {hideHandles: true, hidePoints: true, finalize: true})
-      } else {
-        console.log('skip')
-      }
-    }
-  } else if (stroke.command === 'smooth curveto') {
-    const p0 = {x: stroke.x0 + dx, y: -stroke.y0 - dy}
-    const p1 = {
-      x: 2 * stroke.x0 - MyCalc.lastControlPoint.cubic.x + 2 * dx,
-      y: 2 * -stroke.y0 - MyCalc.lastControlPoint.cubic.y - 2 * dy,
-    }
-    const p2 = {x: stroke.x2 + dx, y: -stroke.y2 - dy}
-    MyCalc.lastControlPoint.cubic = p2
-    MyCalc.lastControlPoint.quadratic = { x: 0, y: 0 }
-    const p3 = {x: stroke.x + dx, y: -stroke.y - dy}
-    const minMax = bezierMinMax(p0, p1, p2, p3)
-    if ((minMax.max.y - minMax.min.y < MyCalc.minRes) && (minMax.max.x - minMax.min.x < MyCalc.minRes)) {
-    } else {
-      const defArray = [
-        Math.floor(p0.x / MyCalc.minRes),
-        Math.floor(p1.x / MyCalc.minRes),
-        Math.floor(p1.x / MyCalc.minRes),
-        Math.floor(p1.y / MyCalc.minRes),
-        Math.floor(p2.x / MyCalc.minRes),
-        Math.floor(p2.y / MyCalc.minRes),
-        Math.floor(p3.x / MyCalc.minRes),
-        Math.floor(p3.y / MyCalc.minRes),
-      ].sort().toString()
-      if (!MyCalc.doneLines.has(defArray)) {
-        MyCalc.doneLines.add(defArray)
-        createBezier(p0, p1, p2, p3, startId, {hideHandles: true, hidePoints: true, finalize: true})
-      } else {
-        console.log('skip')
-      }
-    }
-  } else if (stroke.command === 'elliptical arc') {
-    const r = stroke.rx
-    const centerParam = svgArcToCenterParam(stroke.x0, stroke.y0, r, r, 0, stroke.largeArc, stroke.sweep, stroke.x, stroke.y)
-    centerParam.cx = centerParam.cx + dx
-    centerParam.cy = -centerParam.cy - dy
-    const p1x = stroke.x0 + dx
-    const p1y = - stroke.y0 - dy
-    const p2x = stroke.x + dx
-    const p2y = - stroke.y - dy
-    const defArray = [
-      Math.floor(p1x / MyCalc.minRes),
-      Math.floor(p1y / MyCalc.minRes),
-      Math.floor(p2x / MyCalc.minRes),
-      Math.floor(p2y / MyCalc.minRes),
-      Math.floor(centerParam.cx / MyCalc.minRes),
-      Math.floor(centerParam.cy / MyCalc.minRes),
-    ].sort().toString()
-    if (!MyCalc.doneLines.has(defArray)) {
-      MyCalc.doneLines.add(defArray)
-      createGraphWithBounds(startId, 0, {
-        h: centerParam.cx,
-        k: centerParam.cy,
-        r: r
-      },{
-        xMin: Math.min(p1x, p2x),
-        yMin: Math.min(p1y, p2y),
-        xMax: Math.max(p1x, p2x),
-        yMax: Math.max(p1y, p2y),
-      },{hideAll: true, finalize: true})
-    } else {
-      console.log('skip')
-    }
-    startId += 1
-    MyCalc.globalId = startId
-    MyCalc.lastControlPoint.cubic = { x: 0, y: 0 }
-    MyCalc.lastControlPoint.quadratic = { x: 0, y: 0 }
-  } else if (stroke.command === 'closepath') {
-    if (stroke.x0 != stroke.x && stroke.y0 != stroke.y) {
-      const p0 = {x: stroke.x0 + dx, y: -stroke.y0 - dy}
-      const p1 = {x: stroke.x + dx, y: -stroke.y - dy}
-      const defArray = [
-        Math.floor(p0.x / MyCalc.minRes),
-        Math.floor(p1.x / MyCalc.minRes),
-        Math.floor(p1.x / MyCalc.minRes),
-        Math.floor(p1.y / MyCalc.minRes),
-      ].sort().toString()
-      if (!MyCalc.doneLines.has(defArray)) {
-        MyCalc.doneLines.add(defArray)
-        createLineSegment(p0, p1, startId, {finalize: true})
-      } else {
-        console.log('skip')
-      }
-    }
-    MyCalc.lastControlPoint.cubic = { x: 0, y: 0 }
-    MyCalc.lastControlPoint.quadratic = { x: 0, y: 0 }
-  } else if (stroke.command === 'quadratic curveto') {
-    const p0 = {x: stroke.x0 + dx, y: -stroke.y0 - dy}
-    let p1 = {x: stroke.x1 + dx, y: -stroke.y1 - dy}
-    const p3 = {x: stroke.x + dx, y: -stroke.y - dy}
-    MyCalc.lastControlPoint.quadratic = { x: p1.x, y: p1.y }
-    p1 = {
-      x: p0.x / 3 + 2 * p1.x / 3,
-      y: p0.y / 3 + 2 * p1.y / 3,
-    }
-    const p2 = {
-      x: 2 * p1.x / 3 + p3.x / 3,
-      y: 2 * p1.y / 3 + p3.y / 3,
-    }
-    const minMax = bezierMinMax(p0, p1, p2, p3)
-    if ((minMax.max.y - minMax.min.y < MyCalc.minRes) && (minMax.max.x - minMax.min.x < MyCalc.minRes)) {
-    } else {
-      const defArray = [
-        Math.floor(p0.x / MyCalc.minRes),
-        Math.floor(p1.x / MyCalc.minRes),
-        Math.floor(p1.x / MyCalc.minRes),
-        Math.floor(p1.y / MyCalc.minRes),
-        Math.floor(p2.x / MyCalc.minRes),
-        Math.floor(p2.y / MyCalc.minRes),
-        Math.floor(p3.x / MyCalc.minRes),
-        Math.floor(p3.y / MyCalc.minRes),
-      ].sort().toString()
-      if (!MyCalc.doneLines.has(defArray)) {
-        MyCalc.doneLines.add(defArray)
-        createBezier(p0, p1, p2, p3, startId, {hideHandles: true, hidePoints: true, finalize: true})
-      } else {
-        console.log('skip')
-      }
-    }
-  } else if (stroke.command === 'smooth quadratic curveto') {
-    const p0 = {x: stroke.x0 + dx, y: -stroke.y0 - dy}
-    let p1 = {
-      x: 2 * stroke.x0 - MyCalc.lastControlPoint.quadratic.x + 2 * dx,
-      y: 2 * -stroke.y0 - MyCalc.lastControlPoint.quadratic.y - 2 * dy,
-    }
-    const p3 = {x: stroke.x + dx, y: -stroke.y - dy}
-    MyCalc.lastControlPoint.cubic = { x: 0, y: 0 }
-    MyCalc.lastControlPoint.quadratic = { x: p1.x, y: p1.y }
-    p1 = {
-      x: p0.x / 3 + 2 * p1.x / 3,
-      y: p0.y / 3 + 2 * p1.y / 3,
-    }
-    const p2 = {
-      x: 2 * p1.x / 3 + p3.x / 3,
-      y: 2 * p1.y / 3 + p3.y / 3,
-    }
-    const minMax = bezierMinMax(p0, p1, p2, p3)
-    if ((minMax.max.y - minMax.min.y < MyCalc.minRes) && (minMax.max.x - minMax.min.x < MyCalc.minRes)) {
-    } else {
-      const defArray = [
-        Math.floor(p0.x / MyCalc.minRes),
-        Math.floor(p1.x / MyCalc.minRes),
-        Math.floor(p1.x / MyCalc.minRes),
-        Math.floor(p1.y / MyCalc.minRes),
-        Math.floor(p2.x / MyCalc.minRes),
-        Math.floor(p2.y / MyCalc.minRes),
-        Math.floor(p3.x / MyCalc.minRes),
-        Math.floor(p3.y / MyCalc.minRes),
-      ].sort().toString()
-      if (!MyCalc.doneLines.has(defArray)) {
-        MyCalc.doneLines.add(defArray)
-        createBezier(p0, p1, p2, p3, startId, {hideHandles: true, hidePoints: true, finalize: true})
-      } else {
-        console.log('skip')
-      }
-    }
-  }
 }
 
 export function transformBezier(id: string) {
@@ -925,8 +695,8 @@ export function transformBezier(id: string) {
     if (expression && isBaseExpression(expression)) {
       const graphObject = createGraphObject(expression)
       if (graphObject instanceof Bezier) {
-        const {p1, p2, p3, p4} = graphObject.getControlPoints()
-        createBezier(p1, p2, p3, p4, graphObject.graphId, {finalize: true})
+        const controlPoints = graphObject.getControlPoints()
+        createBezier(controlPoints, graphObject.graphId, {finalize: true})
         MyCalc.deleteById(graphObject.id)
       }
     }

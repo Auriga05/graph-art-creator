@@ -1,10 +1,8 @@
-import { GeneralConicVariables, Bounds, NumberBounds } from './../types';
 import { Conic } from "../classes/Conic";
 import { Graph } from "../classes/Graph";
-import { defaultExpressionFormat, xExpressions, yExpressions } from "../constants";
 import { MyCalc } from "../index.user";
-import { getVariable, LinkedVariable, getDomains, generateBounds, substitute, simplify, setVariable } from "../lib";
-import { Expression, InputBaseExpression } from "../types";
+import { LinkedVariable, getVariable, simplify, substitute, generateBounds, getDomains, setVariable } from "../lib/lib";
+import { Bounds, InputBaseExpression, GeneralConicVariables } from "../types/types";
 
 export type EllipseVariables = {
   h: number,
@@ -24,6 +22,9 @@ export class Ellipse extends Graph implements Initializable, Conic {
   static graphType = 3;
   static isConic = true;
   static hasGeneralForm = true;
+  static xExpression = ['h_{1}-\\frac{a_{1}}{b_{1}}\\sqrt{b_{1}^{2}-\\left(y-k_{1}\\right)^{2}}', 'h_{1}+\\frac{a_{1}}{b_{1}}\\sqrt{b_{1}^{2}-\\left(y-k_{1}\\right)^{2}}']
+  static yExpression = ['k_{1}-\\frac{b_{1}}{a_{1}}\\sqrt{a_{1}^{2}-\\left(x-h_{1}\\right)^{2}}', 'k_{1}+\\frac{b_{1}}{a_{1}}\\sqrt{a_{1}^{2}-\\left(x-h_{1}\\right)^{2}}']
+  static graphTypeName = "ellipse"
   static expressionFormat = [ // Ellipse (x or y)
     { latex: '\\frac{\\left(x-h_{1}\\right)^{2}}{a_{1}^{2}}+\\frac{\\left(y-k_{1}\\right)^{2}}{b_{1}^{2}}=1', types: ['graph'] },
     { latex: '\\left(h_{1},k_{1}\\right)', types: ['point', 'hide'] },
@@ -33,9 +34,9 @@ export class Ellipse extends Graph implements Initializable, Conic {
     { latex: 'h_{1}=0', types: ['var'], name: 'k' },
     { latex: 'a_{1}=1', types: ['var'], name: 'a' },
     { latex: 'b_{1}=1', types: ['var'], name: 'b' },
-    ...defaultExpressionFormat,
-    ...yExpressions[3].map((yExpression, c) => ({ latex: `f_{1y${String.fromCharCode(97 + c)}}(x)=${yExpression}`, types: ['y_expression'], name: `f_{1y${String.fromCharCode(97 + c)}}` })),
-    ...xExpressions[3].map((xExpression, c) => ({ latex: `f_{1x${String.fromCharCode(97 + c)}}(y)=${xExpression}`, types: ['x_expression'], name: `f_{1x${String.fromCharCode(97 + c)}}` })),
+    ...Graph.defaultExpressionFormat,
+    ...Ellipse.yExpression.map((yExpression, c) => ({ latex: `f_{1y${String.fromCharCode(97 + c)}}(x)=${yExpression}`, types: ['y_expression'], name: `f_{1y${String.fromCharCode(97 + c)}}` })),
+    ...Ellipse.xExpression.map((xExpression, c) => ({ latex: `f_{1x${String.fromCharCode(97 + c)}}(y)=${xExpression}`, types: ['x_expression'], name: `f_{1x${String.fromCharCode(97 + c)}}` })),
   ]
   constructor(expression: InputBaseExpression) {
     super(expression, 3);

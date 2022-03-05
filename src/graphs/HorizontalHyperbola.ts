@@ -1,10 +1,8 @@
-import { GeneralConicVariables, Bounds, NumberBounds } from './../types';
 import { Conic } from "../classes/Conic";
 import { Graph } from "../classes/Graph";
-import { defaultExpressionFormat, xExpressions, yExpressions } from "../constants";
 import { MyCalc } from "../index.user";
-import { getVariable, LinkedVariable, getDomains, substitute, simplify, setVariable } from "../lib";
-import { Expression, InputBaseExpression } from "../types";
+import { LinkedVariable, getVariable, simplify, substitute, getDomains, setVariable } from "../lib/lib";
+import { Bounds, InputBaseExpression, GeneralConicVariables } from "../types/types";
 
 export type HorizontalHyperbolaVariables = {
   h: number,
@@ -24,6 +22,9 @@ export class HorizontalHyperbola extends Graph implements Initializable, Conic {
   static graphType = 4;
   static isConic = true;
   static hasGeneralForm = true;
+  static xExpression = ['h_{1}-\\frac{a_{1}}{b_{1}}\\sqrt{b_{1}^{2}+\\left(y-k_{1}\\right)^{2}}', 'h_{1}+\\frac{a_{1}}{b_{1}}\\sqrt{b_{1}^{2}+\\left(y-k_{1}\\right)^{2}}']
+  static yExpression = ['k_{1}-\\frac{b_{1}}{a_{1}}\\sqrt{\\left(x-h_{1}\\right)^{2}-a_{1}^{2}}', 'k_{1}+\\frac{b_{1}}{a_{1}}\\sqrt{\\left(x-h_{1}\\right)^{2}-a_{1}^{2}}']
+  static graphTypeName = "horizontal_hyperbola" 
   static expressionFormat = [ // Horizontal Hyperbola (x)
     { latex: '\\frac{\\left(x-h_{1}\\right)^{2}}{a_{1}^{2}}-\\frac{\\left(y-k_{1}\\right)^{2}}{b_{1}^{2}}=1', types: ['graph'] },
     { latex: '\\left(h_{1},k_{1}\\right)', types: ['point', 'hide'] },
@@ -33,9 +34,9 @@ export class HorizontalHyperbola extends Graph implements Initializable, Conic {
     { latex: 'h_{1}=0', types: ['var'], name: 'h' },
     { latex: 'a_{1}=1', types: ['var'], name: 'a' },
     { latex: 'b_{1}=1', types: ['var'], name: 'b' },
-    ...defaultExpressionFormat,
-    ...yExpressions[4].map((yExpression, c) => ({ latex: `f_{1y${String.fromCharCode(97 + c)}}(x)=${yExpression}`, types: ['y_expression'], name: `f_{1y${String.fromCharCode(97 + c)}}` })),
-    ...xExpressions[4].map((xExpression, c) => ({ latex: `f_{1x${String.fromCharCode(97 + c)}}(y)=${xExpression}`, types: ['x_expression'], name: `f_{1x${String.fromCharCode(97 + c)}}` })),
+    ...Graph.defaultExpressionFormat,
+    ...HorizontalHyperbola.yExpression.map((yExpression, c) => ({ latex: `f_{1y${String.fromCharCode(97 + c)}}(x)=${yExpression}`, types: ['y_expression'], name: `f_{1y${String.fromCharCode(97 + c)}}` })),
+    ...HorizontalHyperbola.xExpression.map((xExpression, c) => ({ latex: `f_{1x${String.fromCharCode(97 + c)}}(y)=${xExpression}`, types: ['x_expression'], name: `f_{1x${String.fromCharCode(97 + c)}}` })),
   ]
   constructor(expression: InputBaseExpression) {
     super(expression, 4);

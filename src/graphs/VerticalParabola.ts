@@ -1,10 +1,8 @@
-import { Bounds, GeneralConicVariables, NumberBounds } from './../types';
 import { Conic } from "../classes/Conic";
 import { Graph } from "../classes/Graph";
-import { defaultExpressionFormat, xExpressions, yExpressions } from "../constants";
 import { MyCalc } from "../index.user";
-import { getVariable, LinkedVariable, substitute, getDomains, generateBounds, setVariable } from "../lib";
-import { Expression, InputBaseExpression } from "../types";
+import { LinkedVariable, getVariable, substitute, generateBounds, getDomains, setVariable } from "../lib/lib";
+import { Bounds, InputBaseExpression, GeneralConicVariables } from "../types/types";
 
 export type VerticalParabolaVariables = {
   h: number,
@@ -23,6 +21,9 @@ export class VerticalParabola extends Graph implements Initializable, Conic {
   static graphType = 2;
   static isConic = true;
   static hasGeneralForm = true;
+  static xExpression = ['h_{1}-\\sqrt{4c_{1}\\left(y-k_{1}\\right)}', 'h_{1}+\\sqrt{4c_{1}\\left(y-k_{1}\\right)}']
+  static yExpression = ['k_{1}+\\frac{\\left(x-h_{1}\\right)^{2}}{4c_{1}}']
+  static graphTypeName = "vertical_parabola"
   static expressionFormat = [ // Vertical Parabola (y)
     { latex: '\\left(x-h_{1}\\right)^{2}=4c_{1}\\left(y-k_{1}\\right)', types: ['graph'] },
     { latex: '\\left(h_{1},k_{1}\\right)', types: ['point', 'hide'] },
@@ -32,9 +33,9 @@ export class VerticalParabola extends Graph implements Initializable, Conic {
     { latex: 'q_{1}=1', types: ['var'], name: 'e' },
     { latex: 'd_{1}=1', types: ['var'], name: 'd' },
     { latex: 'c_{1}=\\frac{q_{1}^{2}}{4d_{1}}', types: ['helper_var'], name: 'c' },
-    ...defaultExpressionFormat,
-    ...yExpressions[2].map((yExpression, c) => ({ latex: `f_{1y${String.fromCharCode(97 + c)}}(x)=${yExpression}`, types: ['y_expression'], name: `f_{1y${String.fromCharCode(97 + c)}}` })),
-    ...xExpressions[2].map((xExpression, c) => ({ latex: `f_{1x${String.fromCharCode(97 + c)}}(y)=${xExpression}`, types: ['x_expression'], name: `f_{1x${String.fromCharCode(97 + c)}}` })),
+    ...Graph.defaultExpressionFormat,
+    ...VerticalParabola.yExpression.map((yExpression, c) => ({ latex: `f_{1y${String.fromCharCode(97 + c)}}(x)=${yExpression}`, types: ['y_expression'], name: `f_{1y${String.fromCharCode(97 + c)}}` })),
+    ...VerticalParabola.xExpression.map((xExpression, c) => ({ latex: `f_{1x${String.fromCharCode(97 + c)}}(y)=${xExpression}`, types: ['x_expression'], name: `f_{1x${String.fromCharCode(97 + c)}}` })),
   ]
   constructor(expression: InputBaseExpression) {
     super(expression, 2);

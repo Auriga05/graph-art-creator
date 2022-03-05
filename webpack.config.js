@@ -1,5 +1,6 @@
 const path = require('path');
 const webpack = require('webpack');
+const fs = require('fs');
 
 module.exports = {
   entry: './src/index.user.ts',
@@ -18,25 +19,12 @@ module.exports = {
     extensions: ['.tsx', '.ts', '.js'],
   },
   output: {
-    filename: 'index-experimental.user.js',
+    filename: './dist/index-experimental.user.js',
     path: __dirname,
   },
   plugins: [
     new webpack.BannerPlugin({
-      banner: `// ==UserScript==
-// @name         Graph Art Creator - Experimental
-// @namespace    http://tampermonkey.net/
-// @version      1.0a
-// @description  precal thing
-// @author       Auriga05
-// @match        https://www.desmos.com/calculator*
-// @icon         https://www.google.com/s2/favicons?domain=desmos.com
-// @grant        unsafeWindow
-// @updateURL    https://github.com/Auriga05/graph-art-creator/raw/master/index.user.js
-// @downloadURL  https://github.com/Auriga05/graph-art-creator/raw/master/index.user.js
-// @require      https://code.jquery.com/jquery-3.5.1.slim.min.js
-// @require      https://cdn.jsdelivr.net/npm/evaluatex@2.2.0/dist/evaluatex.min.js
-// ==/UserScript==`,
+      banner: fs.readFileSync('./other/header.txt').toString('ascii'),
       raw: true
     })
   ],

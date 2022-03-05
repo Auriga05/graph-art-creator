@@ -1,6 +1,6 @@
 import { MyCalc } from "../index.user";
-import { isBaseExpression, createGraphObject, typeFilter } from "../lib";
-import { IdParts } from "../types";
+import { isBaseExpression, createGraphObject, typeFilter } from "../lib/lib";
+import { IdParts } from "../types/types";
 
 export function hideCropLines(id: IdParts) {
   if (id.isEditable) {

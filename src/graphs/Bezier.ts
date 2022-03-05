@@ -1,11 +1,9 @@
-import { Bounds, NumberBounds } from './../types';
-import { Coordinate } from './../mathLib';
 import { Graph } from "../classes/Graph";
 import { MyCalc } from "../index.user";
-import { getVariable, LinkedVariable, substitute, getDomains, generateBounds, setVariable } from "../lib";
-import { getCriticalPoints, subdivideCubic } from "../bezierLib"
-import { yExpressions, xExpressions } from "../constants";
-import { Expression, InputBaseExpression } from "../types";
+import { getCriticalPoints } from "../lib/bezierLib";
+import { LinkedVariable, getDomains, getVariable, setVariable } from "../lib/lib";
+import { Coordinate } from "../lib/mathLib";
+import { Bounds, NumberBounds, InputBaseExpression } from "../types/types";
 
 export type BezierVariables = {
   xa: number
@@ -29,6 +27,9 @@ export class Bezier extends Graph implements Initializable {
   static isConic = false;
   static hasGeneralForm = false;
   static graphType = 7;
+  static xExpression: string[] = []
+  static yExpression: string[] = []
+  static graphTypeName = "bezier"
   static expressionFormat = [
     {latex: `(B_{1x}(t),B_{1y}(t))`, types: ['graph']},
     {latex: `B_{1x}(t)=(1-t)^{3}p_{1xa}+3t(1-t)^{2}p_{1xb}+3t^{2}(1-t)p_{1xc}+t^{3}p_{1xd}`, types: ['function', 'hidden']},
@@ -47,8 +48,8 @@ export class Bezier extends Graph implements Initializable {
     {latex: `(p_{1xd},p_{1yd})`, types: ['point']},
     {latex: `(p_{1xa}+t(p_{1xb}-p_{1xa}),p_{1ya}+t(p_{1yb}-p_{1ya}))`, types: ['handle']},
     {latex: `(p_{1xd}+t(p_{1xc}-p_{1xd}),p_{1yd}+t(p_{1yc}-p_{1yd}))`, types: ['handle']},
-    ...yExpressions[7].map((yExpression, c) => ({ latex: `f_{1y${String.fromCharCode(97 + c)}}(x)=${yExpression}`, types: ['y_expression'], name: `f_{1y${String.fromCharCode(97 + c)}}` })),
-    ...xExpressions[7].map((xExpression, c) => ({ latex: `f_{1x${String.fromCharCode(97 + c)}}(y)=${xExpression}`, types: ['x_expression'], name: `f_{1x${String.fromCharCode(97 + c)}}` })),
+    ...Bezier.yExpression.map((yExpression, c) => ({ latex: `f_{1y${String.fromCharCode(97 + c)}}(x)=${yExpression}`, types: ['y_expression'], name: `f_{1y${String.fromCharCode(97 + c)}}` })),
+    ...Bezier.xExpression.map((xExpression, c) => ({ latex: `f_{1x${String.fromCharCode(97 + c)}}(y)=${xExpression}`, types: ['x_expression'], name: `f_{1x${String.fromCharCode(97 + c)}}` })),
   ]
   constructor(expression: InputBaseExpression) {
     super(expression, 7);

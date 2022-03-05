@@ -1,21 +1,8 @@
-import { GeneralConicVariables, Bounds, NumberBounds, MinBaseExpression } from './../types';
-import { Conic } from '../classes/Conic';
-import { Graph } from '../classes/Graph';
-import { defaultExpressionFormat, xExpressions, yExpressions } from '../constants';
-import { createGraphWithBounds, MyCalc } from '../index.user';
-import {
-  generateBounds,
-  getDomains,
-  getDomainsFromLatex,
-  getVariable,
-  LinkedVariable,
-  parseDomains,
-  setVariable,
-  simplify,
-  substitute,
-} from '../lib';
-import { Expression, InputBaseExpression } from '../types';
-import { getGraphTypeFromStandard, regex } from '../actions/convertFromStandard';
+import { Conic } from "../classes/Conic";
+import { Graph } from "../classes/Graph";
+import { MyCalc } from "../index.user";
+import { LinkedVariable, getVariable, simplify, substitute, generateBounds, getDomains, setVariable } from "../lib/lib";
+import { Bounds, InputBaseExpression, GeneralConicVariables } from "../types/types";
 
 export type CircleVariables = {
   h: number,
@@ -35,6 +22,9 @@ export class Circle extends Graph implements Initializable, Conic {
   static graphType = 0;
   static isConic = true;
   static hasGeneralForm = true;
+  static xExpression = ['h_{1}-\\sqrt{r_{1}^{2}-\\left(y-k_{1}\\right)^{2}}', 'h_{1}+\\sqrt{r_{1}^{2}-\\left(y-k_{1}\\right)^{2}}']
+  static yExpression = ['k_{1}-\\sqrt{r_{1}^{2}-\\left(x-h_{1}\\right)^{2}}', 'k_{1}+\\sqrt{r_{1}^{2}-\\left(x-h_{1}\\right)^{2}}']
+  static graphTypeName = "circle"
   static expressionFormat = [ // Circle (x or y)
     { latex: '\\left(x-h_{1}\\right)^{2}+\\left(y-k_{1}\\right)^{2}=r_{1}^{2}', types: ['graph'], name: 'graph' },
     { latex: '\\left(h_{1},k_{1}\\right)', types: ['point', 'hide'] },
@@ -44,9 +34,9 @@ export class Circle extends Graph implements Initializable, Conic {
     { latex: 'k_{1}=0', types: ['var'], name: 'k' },
     { latex: 'a_{1}=1', types: ['var'], name: 'a' },
     { latex: 'b_{1}=0', types: ['var'], name: 'b' },
-    ...defaultExpressionFormat,
-    ...yExpressions[0].map((yExpression, c) => ({ latex: `f_{1y${String.fromCharCode(97 + c)}}(x)=${yExpression}`, types: ['y_expression'], name: `f_{1y${String.fromCharCode(97 + c)}}` })),
-    ...xExpressions[0].map((xExpression, c) => ({ latex: `f_{1x${String.fromCharCode(97 + c)}}(y)=${xExpression}`, types: ['x_expression'], name: `f_{1x${String.fromCharCode(97 + c)}}` })),
+    ...Graph.defaultExpressionFormat,
+    ...Circle.yExpression.map((yExpression, c) => ({ latex: `f_{1y${String.fromCharCode(97 + c)}}(x)=${yExpression}`, types: ['y_expression'], name: `f_{1y${String.fromCharCode(97 + c)}}` })),
+    ...Circle.xExpression.map((xExpression, c) => ({ latex: `f_{1x${String.fromCharCode(97 + c)}}(y)=${xExpression}`, types: ['x_expression'], name: `f_{1x${String.fromCharCode(97 + c)}}` })),
   ]
   constructor(expression: InputBaseExpression) {
     super(expression, 0);

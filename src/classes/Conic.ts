@@ -1,4 +1,4 @@
-import { LinkedVariable } from "../lib";
+import { LinkedVariable } from "../lib/lib";
 
 export interface Conic {
   getGeneralForm(): {
