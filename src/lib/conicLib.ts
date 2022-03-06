@@ -48,3 +48,24 @@ export function getConicFit(points: Coordinate[]) {
 //   {x: -9, y: 2},
 //   {x: -7, y: 1},
 // ]))
+
+function matrixFromStandard(conic: StandardConicVariables) {
+  return new mlMatrix.Matrix(
+    [
+      [conic.A, conic.B / 2, conic.D / 2],
+      [conic.B / 2, conic.C, conic.E / 2],
+      [conic.D / 2, conic.E / 2, conic.F],
+    ]
+  )
+}
+
+type StandardConicVariables = {A: number, B: number, C: number, D: number, E: number, F: number}
+export function intersectConics(first: StandardConicVariables, second: StandardConicVariables) {
+  const firstMatrix = matrixFromStandard(first)
+  const secondMatrix = matrixFromStandard(second)
+  const A = firstMatrix.mmul(mlMatrix.inverse(secondMatrix))
+  const eigen = new mlMatrix.EigenvalueDecomposition(A)
+  const eigenvalue = eigen.realEigenvalues[0]
+  const degenerateConicMatrix = firstMatrix.mmul(secondMatrix.mul(eigenvalue))
+  mlMatrix.linearDependencies(degenerateConicMatrix)
+}

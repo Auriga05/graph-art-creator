@@ -2,7 +2,7 @@ import { getGraphTypeFromStandard } from "../actions/convertFromStandard"
 import { unfinalize, finalize } from "../actions/finalize"
 import { hideCropLines } from "../actions/hideCropLines"
 import { Bezier } from "../graphs/Bezier"
-import { LinkedVariable, isBaseExpression, getIdParts, isFinal, functionRegex, createGraphObject, substituteToAll, getVariablesNeeded, transformBezier, substituteFromId, usesVariable } from "../lib/lib"
+import { LinkedVariable, isBaseExpression, getIdParts, isFinal, functionRegex, createGraphObject, substituteToAll, getVariablesNeeded, transformBezier, substituteFromId, usesVariable, setVariable } from "../lib/lib"
 import { CalcType, ControllerType, State } from "../types/desmosTypes"
 import { Expression, InputBaseExpression, TableExpression, MinBaseExpression, BaseExpression } from "../types/types"
 import { HaxProcessor } from "./HaxProcessor"
@@ -14,7 +14,6 @@ export class MyCalcClass {
   linkedVariables: {[key: string]: LinkedVariable}
   usedId: Set<number>
   logicalExpressions: {[key: string]: Expression}
-  globalVariablesObject: {[key: string]: string}
   globalFunctionsObject: {[key: string]: {id: string, args: string[], definition: string}}
   expressionsToRemove: {beforeRemove: string, expressions: Expression[]}[]
   globalId: number
@@ -32,7 +31,6 @@ export class MyCalcClass {
     this.Controller = _Calc.controller;
     this.logicalExpressions = {}
     this.usedId = new Set<number>()
-    this.globalVariablesObject = {}
     this.globalFunctionsObject = {}
     this.linkedVariables = {}
     this.expressionsToRemove = []
@@ -541,7 +539,7 @@ export class MyCalcClass {
           if (analysis.evaluation.type === 'Number') {
             const variable = expression.latex.split('=')[0];
             if (variable.includes('_') && !(['x', 'y'].includes(variable))) {
-              this.globalVariablesObject[variable] = analysis.evaluation.value.toString();
+              setVariable(variable, analysis.evaluation.value.toString());
             }
           }
         } else if (expression.latex) {

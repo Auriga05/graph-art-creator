@@ -141,7 +141,7 @@ export function createGraphWithBounds(graphId: number, graphType: GraphTypeNames
       newExpressionLatex = newExpressionLatex.replaceAll('_{1', `_{${graphId}`);
       if (doesIntersect(newExpression.types, ['var'])) {
         const [variable] = newExpressionLatex.split('=');
-        const value = MyCalc.globalVariablesObject[toId(variable, graphId)];
+        const value = MyCalc.virtualCalc.variables[toId(variable, graphId)];
         newExpressionLatex = `${variable}=${simplify(parseFloat(value), 4)}`;
       }
       let label = ""

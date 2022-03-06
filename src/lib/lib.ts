@@ -19,8 +19,8 @@ declare const evaluatex: EvaluatexType
 export function getVariable(name: string): number {
   const match = name.match(/(\w_{\d+\w*})/g);
   if (match && match[0].length === name.length) {
-    if (name in MyCalc.globalVariablesObject) {
-      return parseFloat(MyCalc.globalVariablesObject[name]);
+    if (name in MyCalc.virtualCalc.variables) {
+      return parseFloat(MyCalc.virtualCalc.variables[name]);
     } else if (name in MyCalc.linkedVariables) {
       return MyCalc.linkedVariables[name].value
     }
@@ -137,7 +137,7 @@ export class LinkedVariable {
       this.clean = true
     }
     if (this.reference) {
-      MyCalc.globalVariablesObject[this.reference] = _value.toString();
+      setVariable(this.reference, _value.toString())
     }
     this._value = _value;
   }
@@ -404,7 +404,6 @@ export function setVariable(variable: string, _value: string | number | LinkedVa
   MyCalc.virtualCalc.setVariables([
     {key: variable, value}
   ])
-  MyCalc.globalVariablesObject[variable] = value;
 }
 
 export function toId(expression: string, _id: string | number) {
@@ -471,7 +470,7 @@ export function createConic(graphType: GraphTypeNames, id: number, options?: Gra
     newExpressionLatex = newExpressionLatex.replace(/_\{\d+([a-zA-Z]*)}/g, `_{${id}$1}`);
     if (doesIntersect(newExpression.types, ['var'])) {
       const [variable] = newExpressionLatex.split('=');
-      const value = MyCalc.globalVariablesObject[toId(variable, id)];
+      const value = MyCalc.virtualCalc.variables[toId(variable, id)];
       newExpressionLatex = `${variable}=${simplify(parseFloat(value), 4)}`;
     }
     const hidden = doesIntersect(
