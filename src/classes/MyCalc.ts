@@ -2,7 +2,7 @@ import { getGraphTypeFromStandard } from "../actions/convertFromStandard"
 import { unfinalize, finalize } from "../actions/finalize"
 import { hideCropLines } from "../actions/hideCropLines"
 import { Bezier } from "../graphs/Bezier"
-import { LinkedVariable, isBaseExpression, getIdParts, isFinal, functionRegex, createGraphObject, substituteToAll, getVariablesNeeded, transformBezier, substituteFromId, usesVariable, setVariable } from "../lib/lib"
+import { LinkedVariable, isBaseExpression, getIdParts, isFinal, functionRegex, createGraphObject, substituteToAll, getVariablesNeeded, transformBezier, substituteFromId, usesVariable, setVariable, getValue } from "../lib/lib"
 import { CalcType, ControllerType, State } from "../types/desmosTypes"
 import { Expression, InputBaseExpression, TableExpression, MinBaseExpression, BaseExpression } from "../types/types"
 import { HaxProcessor } from "./HaxProcessor"
@@ -182,13 +182,19 @@ export class MyCalcClass {
       if (!expression.id) {
         throw Error("Expression without id")
       }
-      const id = getIdParts(expression.id);
-      if (id.isFinal || id.isEditable) {
-        if (this.usedId.has(id.graphId)) {
-          this.usedId.delete(id.graphId)
+      if (this.isLogical(expression.id)) {
+        delete this.logicalExpressions[expression.id]
+      } else {
+        this.Calc.removeExpression(expression as BaseExpression);
+        const id = getIdParts(expression.id);
+        if (id.isFinal || id.isEditable) {
+          if (this.usedId.has(id.graphId)) {
+            this.usedId.delete(id.graphId)
+          }
         }
       }
     })
+    this.virtualCalc.removeExpressions(expressions)
     this.Calc.removeExpressions(expressions);
   }
 
@@ -204,6 +210,7 @@ export class MyCalcClass {
         }
       }
     }
+    this.virtualCalc.removeExpressions([expression])
   }
 
   removeExpressionById(_id: string) {
@@ -217,7 +224,7 @@ export class MyCalcClass {
       } else {
         const expression = this.getExpression(id.id)
         if (expression) {
-          this.removeExpression(expression)
+          this.removeExpressions([expression])
         }
       }
     }
@@ -274,7 +281,7 @@ export class MyCalcClass {
             }
             if (hasValues) {
             // console.log(Object.entries(values).map(value => `${value[1].reference}:${value[1].value}`).join(','))
-              if (Object.values(values).every(value => value.value)) {
+              if (Object.values(values).every(value => getValue(value))) {
                 if (graphObject instanceof Bezier) {
                   transformBezier(graphObject.id)
                   this.expressionsToRemove.push({
@@ -302,7 +309,7 @@ export class MyCalcClass {
       if (['shade', 'final'].includes(_id.split('_')[0])) {
         const expression = this.getExpression(_id);
         if (expression) {
-          this.removeExpression(expression);
+          this.removeExpressions([expression]);
         }
       } else {
         const graphId = parseInt(_id.split('_')[0]);
@@ -351,6 +358,7 @@ export class MyCalcClass {
 
   updateExpression(expression: BaseExpression, _logical?: boolean) {
     const logical = !!_logical
+    this.virtualCalc.setExpressions([expression])
     if (logical) {
       this.setLogicalExpression(expression);
     } else {
@@ -360,6 +368,7 @@ export class MyCalcClass {
 
   setExpression(expression: InputBaseExpression | TableExpression, _logical?: boolean) {
     const logical = !!_logical
+    this.virtualCalc.setExpressions([expression])
     if (logical) {
       this.setLogicalExpression(expression);
     } else {
@@ -447,21 +456,9 @@ export class MyCalcClass {
     this.setExpression(this.table(points))
   }
 
-  linkedVariable(reference: number): LinkedVariable
-  linkedVariable(reference: string, _value ?: number): LinkedVariable
-  linkedVariable(reference: number): LinkedVariable
-  linkedVariable(reference: number | string | {[key: string]: number} | null, _value ?: number) {
+  linkedVariable(reference: string, _value ?: number): LinkedVariable {
     if (typeof reference === 'number') {
       return new LinkedVariable(reference, _value);
-    } else if (typeof reference === 'object') {
-      if (reference) {
-        const newReference: {[key: string]: LinkedVariable} = {}
-        Object.entries(reference)
-          .forEach(pair => {
-            newReference[pair[0]] = this.linkedVariable(pair[1])
-          })
-        return newReference;
-      }
     } else {
       if (reference) {
         if (reference in this.linkedVariables) {
@@ -481,11 +478,7 @@ export class MyCalcClass {
 
   addLinkedVariable(linkedVariable: LinkedVariable) {
     if (linkedVariable.reference) {
-      if (linkedVariable.reference in this.linkedVariables) {
-        this.linkedVariables[linkedVariable.reference] = linkedVariable
-      } else {
-        this.linkedVariables[linkedVariable.reference] = linkedVariable
-      }
+      this.linkedVariables[linkedVariable.reference] = linkedVariable
     }
   }
 

@@ -1,9 +1,9 @@
 import { Graph } from "../classes/Graph";
 import { MyCalc } from "../index.user";
 import { getCriticalPoints } from "../lib/bezierLib";
-import { LinkedVariable, getDomains, getVariable, setVariable } from "../lib/lib";
+import { LinkedVariable, getDomains, getVariable, setVariable, getValue } from "../lib/lib";
 import { Coordinate } from "../lib/mathLib";
-import { Bounds, NumberBounds, InputBaseExpression } from "../types/types";
+import { Bounds, NumberBounds, InputBaseExpression, Value } from "../types/types";
 
 export type BezierVariables = {
   xa: number
@@ -58,10 +58,10 @@ export class Bezier extends Graph implements Initializable {
   convertToStandard() {
     const { xa, ya, xb, yb, xc, yc, xd, yd } = this.getGraphVariables();
     const criticalPoints = getCriticalPoints(
-      {x: xa.value, y: ya.value},
-      {x: xb.value, y: yb.value},
-      {x: xc.value, y: yc.value},
-      {x: xd.value, y: yd.value},
+      {x: getValue(xa), y: getValue(ya)},
+      {x: getValue(xb), y: getValue(yb)},
+      {x: getValue(xc), y: getValue(yc)},
+      {x: getValue(xd), y: getValue(yd)},
     )
     return ''
   }
@@ -86,7 +86,7 @@ export class Bezier extends Graph implements Initializable {
   getEndpoints() {
     const { graphId } = this;
     const domains = getDomains(graphId);
-    let points: { x: LinkedVariable, y: LinkedVariable } [] = [];
+    let points: { x: Value, y: Value } [] = [];
     const variables = this.getGraphVariables();
     const { xa, ya, xb, yb, xc, yc, xd, yd } = variables;
 
@@ -109,8 +109,8 @@ export class Bezier extends Graph implements Initializable {
     const relevantIndices = [];
     const h = getVariable(`h_{${graphId}}`);
     if (axis === 'x') {
-      if (h < xMax.value) relevantIndices.push(1);
-      if (xMin.value < h) relevantIndices.push(0);
+      if (h < getValue(xMax)) relevantIndices.push(1);
+      if (getValue(xMin) < h) relevantIndices.push(0);
     }
     if (axis === 'y') {
       relevantIndices.push(0);
@@ -150,20 +150,20 @@ export class Bezier extends Graph implements Initializable {
     const { xa, ya, xb, yb, xc, yc, xd, yd } = this.getGraphVariables()
     return {
       p1: {
-        x: xa.value,
-        y: ya.value,
+        x: getValue(xa),
+        y: getValue(ya),
       },
       p2: {
-        x: xb.value,
-        y: yb.value,
+        x: getValue(xb),
+        y: getValue(yb),
       },
       p3: {
-        x: xc.value,
-        y: yc.value,        
+        x: getValue(xc),
+        y: getValue(yc),        
       },
       p4: {
-        x: xd.value,
-        y: yd.value,
+        x: getValue(xd),
+        y: getValue(yd),
       }
     }
   }

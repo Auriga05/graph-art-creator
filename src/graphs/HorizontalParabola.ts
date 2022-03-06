@@ -1,8 +1,8 @@
 import { Conic } from "../classes/Conic";
 import { Graph } from "../classes/Graph";
 import { MyCalc } from "../index.user";
-import { LinkedVariable, getVariable, simplify, substitute, generateBounds, getDomains, setVariable } from "../lib/lib";
-import { Bounds, InputBaseExpression, GeneralConicVariables } from "../types/types";
+import { LinkedVariable, getVariable, simplify, substitute, generateBounds, getDomains, setVariable, getValue } from "../lib/lib";
+import { Bounds, InputBaseExpression, GeneralConicVariables, Value } from "../types/types";
 
 export type HorizontalParabolaVariables = {
   h: number,
@@ -90,14 +90,14 @@ export class HorizontalParabola extends Graph implements Initializable, Conic {
   getEndpoints() {
     const { graphId } = this;
     const domains = getDomains(graphId);
-    let points: { x: LinkedVariable, y: LinkedVariable } [] = [];
+    let points: { x: Value, y: Value } [] = [];
     const variables = this.getConicVariables();
     const evaluations = this.evaluateBounds(variables, domains)
     const { h, k, c } = variables;
 
     points = [
-      { x: MyCalc.linkedVariable(Infinity), y: MyCalc.linkedVariable(-Infinity) },
-      { x: MyCalc.linkedVariable(Infinity), y: MyCalc.linkedVariable(Infinity) },
+      { x: Infinity, y: -Infinity },
+      { x: Infinity, y: Infinity },
       { x: h, y: k },
     ];
 
@@ -116,8 +116,8 @@ export class HorizontalParabola extends Graph implements Initializable, Conic {
       relevantIndices.push(0);
     }
     if (axis === 'y') {
-      if (k < yMax.value) relevantIndices.push(1);
-      if (yMin.value < k) relevantIndices.push(0);
+      if (k < getValue(yMax)) relevantIndices.push(1);
+      if (getValue(yMin) < k) relevantIndices.push(0);
     }
     return relevantIndices;
   }
@@ -132,9 +132,9 @@ export class HorizontalParabola extends Graph implements Initializable, Conic {
 
   static setGraphVariables(variables: HorizontalParabolaVariables | {[Property in keyof HorizontalParabolaVariables]: LinkedVariable}, graphId: number) {
     let { k, c, h } = variables; 
-    if (h instanceof LinkedVariable) h = h.value
-    if (c instanceof LinkedVariable) c = c.value
-    if (k instanceof LinkedVariable) k = k.value
+    if (h instanceof LinkedVariable) h = getValue(h)
+    if (c instanceof LinkedVariable) c = getValue(c)
+    if (k instanceof LinkedVariable) k = getValue(k)
     const d = Math.sign(c) / 4;
     const e = Math.sqrt(Math.abs(c));
     setVariable(`h_{${graphId}}`, h);

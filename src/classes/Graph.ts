@@ -1,6 +1,6 @@
 import { MyCalc } from "../index.user"
-import { EvaluatexType, LinkedVariable, getIdParts, getGraphType, getDomains, minLinkedVariable, maxLinkedVariable, hasXDomain, hasYDomain } from "../lib/lib"
-import { InputBaseExpression, LinkedCoordinate, Bounds, Evaluations, LatexExpression, GraphTypes } from "../types/types"
+import { EvaluatexType, LinkedVariable, getIdParts, getGraphType, getDomains, minValue as minValue, maxValue as maxValue, hasXDomain, hasYDomain, getValue, setValue, getReference } from "../lib/lib"
+import { InputBaseExpression, LinkedCoordinate, Bounds, Evaluations, LatexExpression, GraphTypes, Value, BoundsValues } from "../types/types"
 
 declare const evaluatex: EvaluatexType
 
@@ -118,41 +118,41 @@ export abstract class Graph implements InputBaseExpression {
       { x: domains.xMin, y: evaluations.ya.max },
       { x: domains.xMax, y: evaluations.yb.min },
       { x: domains.xMax, y: evaluations.yb.max },
-    ].filter((point) => Number.isFinite(point.x.value));
+    ].filter((point) => Number.isFinite(getValue(point.x)));
 
     const yPoints = [
       { x: evaluations.xa.min, y: domains.yMin },
       { x: evaluations.xa.max, y: domains.yMin },
       { x: evaluations.xb.min, y: domains.yMax },
       { x: evaluations.xb.max, y: domains.yMax },
-    ].filter((point) => Number.isFinite(point.y.value));
+    ].filter((point) => Number.isFinite(getValue(point.y)));
 
     return [...xPoints, ...yPoints]
   }
   getBounds() {
     const { graphId } = this;
-    let { xMin, yMin, xMax, yMax } = getDomains(graphId);
+    let { xMin, yMin, xMax, yMax }: BoundsValues = getDomains(graphId);
     const { specialPoints, cropPoints } = this.getEndpoints();
     const points = [...specialPoints, ...cropPoints];
-    const innerPoints = points.filter((point) => (xMin.value <= point.x.value)
-      && (point.x.value <= xMax.value)
-      && (yMin.value <= point.y.value)
-      && (point.y.value <= yMax.value));
+    const innerPoints = points.filter((point) => (getValue(xMin) <= getValue(point.x))
+      && (getValue(point.x) <= getValue(xMax))
+      && (getValue(yMin) <= getValue(point.y))
+      && (getValue(point.y) <= getValue(yMax)));
 
-    const x1 = minLinkedVariable(innerPoints.map((point) => point.x));
-    const x2 = maxLinkedVariable(innerPoints.map((point) => point.x));
-    const y1 = minLinkedVariable(innerPoints.map((point) => point.y));
-    const y2 = maxLinkedVariable(innerPoints.map((point) => point.y));
+    const x1 = minValue(innerPoints.map((point) => point.x));
+    const x2 = maxValue(innerPoints.map((point) => point.x));
+    const y1 = minValue(innerPoints.map((point) => point.y));
+    const y2 = maxValue(innerPoints.map((point) => point.y));
 
-    const x1s = minLinkedVariable(specialPoints.map((point) => point.x));
-    const x2s = maxLinkedVariable(specialPoints.map((point) => point.x));
-    const y1s = minLinkedVariable(specialPoints.map((point) => point.y));
-    const y2s = maxLinkedVariable(specialPoints.map((point) => point.y));
+    const x1s = minValue(specialPoints.map((point) => point.x));
+    const x2s = maxValue(specialPoints.map((point) => point.x));
+    const y1s = minValue(specialPoints.map((point) => point.y));
+    const y2s = maxValue(specialPoints.map((point) => point.y));
 
-    xMin = maxLinkedVariable([xMin, x1]);
-    yMin = maxLinkedVariable([yMin, y1]);
-    xMax = minLinkedVariable([xMax, x2]);
-    yMax = minLinkedVariable([yMax, y2]); 
+    xMin = maxValue([xMin, x1]);
+    yMin = maxValue([yMin, y1]);
+    xMax = minValue([xMax, x2]);
+    yMax = minValue([yMax, y2]); 
     const cropType = this.getCropType();
 
     const {
@@ -162,20 +162,20 @@ export abstract class Graph implements InputBaseExpression {
       yMax: yMaxDomain,
     } = getDomains(this.graphId);
 
-    xMin = parseFloat(xMinDomain.value.toFixed(MyCalc.precision)) < parseFloat(xMin.value.toFixed(MyCalc.precision)) ? xMin : xMinDomain;
-    xMax = parseFloat(xMaxDomain.value.toFixed(MyCalc.precision)) > parseFloat(xMax.value.toFixed(MyCalc.precision)) ? xMax : xMaxDomain;
-    yMin = parseFloat(yMinDomain.value.toFixed(MyCalc.precision)) < parseFloat(yMin.value.toFixed(MyCalc.precision)) ? yMin : yMinDomain;
-    yMax = parseFloat(yMaxDomain.value.toFixed(MyCalc.precision)) > parseFloat(yMax.value.toFixed(MyCalc.precision)) ? yMax : yMaxDomain;
+    xMin = parseFloat(getValue(xMinDomain).toFixed(MyCalc.precision)) < parseFloat(getValue(xMin).toFixed(MyCalc.precision)) ? xMin : xMinDomain;
+    xMax = parseFloat(getValue(xMaxDomain).toFixed(MyCalc.precision)) > parseFloat(getValue(xMax).toFixed(MyCalc.precision)) ? xMax : xMaxDomain;
+    yMin = parseFloat(getValue(yMinDomain).toFixed(MyCalc.precision)) < parseFloat(getValue(yMin).toFixed(MyCalc.precision)) ? yMin : yMinDomain;
+    yMax = parseFloat(getValue(yMaxDomain).toFixed(MyCalc.precision)) > parseFloat(getValue(yMax).toFixed(MyCalc.precision)) ? yMax : yMaxDomain;
 
-    xMin = hasXDomain(cropType) ? xMin : MyCalc.linkedVariable(-Infinity);
-    xMax = hasXDomain(cropType) ? xMax : MyCalc.linkedVariable(Infinity);
-    yMin = hasYDomain(cropType) ? yMin : MyCalc.linkedVariable(-Infinity);
-    yMax = hasYDomain(cropType) ? yMax : MyCalc.linkedVariable(Infinity);
+    xMin = hasXDomain(cropType) ? xMin : -Infinity;
+    xMax = hasXDomain(cropType) ? xMax : Infinity;
+    yMin = hasYDomain(cropType) ? yMin : -Infinity;
+    yMax = hasYDomain(cropType) ? yMax : Infinity;
 
-    xMin.value -= 10 ** (-MyCalc.precision)
-    xMax.value += 10 ** (-MyCalc.precision)
-    yMin.value -= 10 ** (-MyCalc.precision)
-    yMax.value += 10 ** (-MyCalc.precision)
+    xMin = setValue(xMin, getValue(xMin) - 10 ** (-MyCalc.precision))
+    xMax = setValue(xMax, getValue(xMax) + 10 ** (-MyCalc.precision))
+    yMin = setValue(yMin, getValue(yMin) - 10 ** (-MyCalc.precision))
+    yMax = setValue(yMax, getValue(yMax) + 10 ** (-MyCalc.precision))
 
     return { xMin, yMin, xMax, yMax };
   }
@@ -200,9 +200,9 @@ export abstract class Graph implements InputBaseExpression {
 
   evaluator(
     axis: string,
-    _variables: {[key: string]: LinkedVariable},
-    input: {[key: string]: LinkedVariable},
-  ): { min: LinkedVariable, max: LinkedVariable }
+    _variables: {[key: string]: Value},
+    input: {[key: string]: Value},
+  ): { min: Value, max: Value }
   {
     const variables: {
       [key: string]: number
@@ -210,9 +210,9 @@ export abstract class Graph implements InputBaseExpression {
     const inputAxis = axis === 'x' ? 'y' : 'x';
     Object.entries(_variables)
       .forEach(([key, value]) => {
-        variables[key] = value.value;
+        variables[key] = getValue(value);
       });
-    variables[inputAxis] = input[inputAxis].value;
+    variables[inputAxis] = getValue(input[inputAxis]);
 
     const values = [];
     const expressions = axis === 'x' ? Graph.xExpressionsEval[this.graphType] : Graph.yExpressionsEval[this.graphType];
@@ -222,44 +222,44 @@ export abstract class Graph implements InputBaseExpression {
       const value = evaluatex(expression, variables)();
       if (value) {
         values.push(MyCalc.linkedVariable(
-          `f_{${this.graphId}${axis}${String.fromCharCode(97 + i)}}(${input[inputAxis].reference})`, value,
+          `f_{${this.graphId}${axis}${String.fromCharCode(97 + i)}}(${getReference(input[inputAxis])})`, value,
         ));
       }
     }
-    return { min: minLinkedVariable(values), max: maxLinkedVariable(values) };
+    return { min: minValue(values), max: maxValue(values) };
   }
 
-  getRealBounds() {
+  getRealBounds(): BoundsValues {
     const { graphId } = this;
-    let { xMin, yMin, xMax, yMax } = getDomains(graphId);
-    let [newXMin, newXMax, newYMin, newYMax] = [
-      MyCalc.linkedVariable(-Infinity), MyCalc.linkedVariable(Infinity), MyCalc.linkedVariable(-Infinity), MyCalc.linkedVariable(Infinity),
+    let { xMin, yMin, xMax, yMax }: BoundsValues = getDomains(graphId);
+    let [newXMin, newXMax, newYMin, newYMax]: Value[] = [
+      -Infinity, Infinity, -Infinity, Infinity,
     ];
     const { specialPoints, cropPoints } = this.getEndpoints();
     const points = [...specialPoints, ...cropPoints];
-    const innerPoints = points.filter((point) => (xMin.value <= point.x.value)
-      && (point.x.value <= xMax.value)
-      && (yMin.value <= point.y.value)
-      && (point.y.value <= yMax.value));
+    const innerPoints = points.filter((point) => (getValue(xMin) <= getValue(point.x))
+      && (getValue(point.x) <= getValue(xMax))
+      && (getValue(yMin) <= getValue(point.y))
+      && (getValue(point.y) <= getValue(yMax)));
 
-    const x1 = minLinkedVariable(innerPoints.map((point) => point.x));
-    const x2 = maxLinkedVariable(innerPoints.map((point) => point.x));
-    const y1 = minLinkedVariable(innerPoints.map((point) => point.y));
-    const y2 = maxLinkedVariable(innerPoints.map((point) => point.y));
+    const x1 = minValue(innerPoints.map((point) => point.x));
+    const x2 = maxValue(innerPoints.map((point) => point.x));
+    const y1 = minValue(innerPoints.map((point) => point.y));
+    const y2 = maxValue(innerPoints.map((point) => point.y));
 
     if (y1 !== undefined && y2 !== undefined) {
-      newYMin = maxLinkedVariable([y1, newYMin]);
-      newYMax = minLinkedVariable([y2, newYMax]);
+      newYMin = maxValue([y1, newYMin]);
+      newYMax = minValue([y2, newYMax]);
     }
     if (x1 !== undefined && x2 !== undefined) {
-      newXMin = maxLinkedVariable([x1, newXMin]);
-      newXMax = minLinkedVariable([x2, newXMax]);
+      newXMin = maxValue([x1, newXMin]);
+      newXMax = minValue([x2, newXMax]);
     }
 
-    xMin = maxLinkedVariable([xMin, newXMin]);
-    yMin = maxLinkedVariable([yMin, newYMin]);
-    xMax = minLinkedVariable([xMax, newXMax]);
-    yMax = minLinkedVariable([yMax, newYMax]);
+    xMin = maxValue([xMin, newXMin]);
+    yMin = maxValue([yMin, newYMin]);
+    xMax = minValue([xMax, newXMax]);
+    yMax = minValue([yMax, newYMax]);
     return { xMin, yMin, xMax, yMax };
   }
 
@@ -289,7 +289,7 @@ export abstract class Graph implements InputBaseExpression {
     const endpoints = this.getEndpoints().cropPoints
 
     const currEndPoint: {
-      endpoint: {x: LinkedVariable, y: LinkedVariable} | null,
+      endpoint: {x: Value, y: Value} | null,
       currMinSqrMagnitude: number
     } = {
       endpoint: null,
@@ -297,7 +297,7 @@ export abstract class Graph implements InputBaseExpression {
     };
 
     endpoints.forEach((endpoint) => {
-      const sqrMagnitude = (endpoint.x.value - point.x) ** 2 + (endpoint.y.value - point.y) ** 2;
+      const sqrMagnitude = (getValue(endpoint.x) - point.x) ** 2 + (getValue(endpoint.y) - point.y) ** 2;
       if (sqrMagnitude < currEndPoint.currMinSqrMagnitude) {
         currEndPoint.endpoint = endpoint;
         currEndPoint.currMinSqrMagnitude = sqrMagnitude;

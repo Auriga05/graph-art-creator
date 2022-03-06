@@ -2,9 +2,9 @@ import { finalizeId, unfinalize, finalize } from "./actions/finalize";
 import { hideCropLines } from "./actions/hideCropLines";
 import { Graph } from "./classes/Graph";
 import { MyCalcClass } from "./classes/MyCalc";
-import { LinkedVariable, setVariable, generateBounds, createGraphObject, doesIntersect, functionRegex, toId, simplify, createConic, isBaseExpression, substituteParenthesis, typeFilter, getIdParts, transformBezier, createLineSegment, createBezier } from "./lib/lib";
+import { LinkedVariable, setVariable, generateBounds, createGraphObject, doesIntersect, functionRegex, toId, simplify, createConic, isBaseExpression, substituteParenthesis, typeFilter, getIdParts, transformBezier, createLineSegment, createBezier, getValue } from "./lib/lib";
 import { CalcType } from "./types/desmosTypes";
-import { Expression, NumberBounds, Bounds, GraphingOptions, InputBaseExpression, BaseExpression, IdParts, GraphTypeIdToName, GraphTypeNames, GraphTypesByName } from "./types/types";
+import { Expression, NumberBounds, Bounds, GraphingOptions, InputBaseExpression, BaseExpression, IdParts, GraphTypeIdToName, GraphTypeNames, GraphTypesByName, Value } from "./types/types";
 
 interface SelectionObject {
   id: string
@@ -35,10 +35,10 @@ export let MyCalc: MyCalcClass;
 
 export function createGraphWithBounds(graphId: number, graphType: GraphTypeNames, variables: any, _bounds: NumberBounds | Bounds, options?: GraphingOptions) {
   const logical = !!options?.logical
-  let xMin = _bounds.xMin instanceof LinkedVariable ? _bounds.xMin.value : _bounds.xMin
-  let yMin = _bounds.yMin instanceof LinkedVariable ? _bounds.yMin.value : _bounds.yMin
-  let xMax = _bounds.xMax instanceof LinkedVariable ? _bounds.xMax.value : _bounds.xMax
-  let yMax = _bounds.yMax instanceof LinkedVariable ? _bounds.yMax.value : _bounds.yMax
+  let xMin = _bounds.xMin instanceof LinkedVariable ? getValue(_bounds.xMin) : _bounds.xMin
+  let yMin = _bounds.yMin instanceof LinkedVariable ? getValue(_bounds.yMin) : _bounds.yMin
+  let xMax = _bounds.xMax instanceof LinkedVariable ? getValue(_bounds.xMax) : _bounds.xMax
+  let yMax = _bounds.yMax instanceof LinkedVariable ? getValue(_bounds.yMax) : _bounds.yMax
   let cropType = 0;
   // 0 - default (x and y), 1 - x only, 2 - y only, 3 - no crop
   if (!Number.isFinite(xMin) && !Number.isFinite(xMax)) { // Has no x domain
@@ -107,16 +107,16 @@ export function createGraphWithBounds(graphId: number, graphType: GraphTypeNames
     if (Class.hasCrop) {
       const bounds = graphObject.getRealBounds();
       if (!Number.isFinite(xMin)) {
-        xMin = bounds.xMin.value - 2;
+        xMin = getValue(bounds.xMin) - 2;
       }
       if (!Number.isFinite(yMin)) {
-        yMin = bounds.yMin.value - 2;
+        yMin = getValue(bounds.yMin) - 2;
       }
       if (!Number.isFinite(xMax)) {
-        xMax = bounds.xMax.value + 2;
+        xMax = getValue(bounds.xMax) + 2;
       }
       if (!Number.isFinite(yMax)) {
-        yMax = bounds.yMax.value + 2;
+        yMax = getValue(bounds.yMax) + 2;
       }
       setVariable(`x_{${graphId}cam}`, (xMin - h).toString());
       setVariable(`y_{${graphId}cam}`, (yMin - k).toString());
@@ -167,16 +167,16 @@ export function createGraphWithBounds(graphId: number, graphType: GraphTypeNames
           });
           const bounds = conic.getRealBounds();
           if (!Number.isFinite(xMin)) {
-            xMin = bounds.xMin.value - 2;
+            xMin = getValue(bounds.xMin) - 2;
           }
           if (!Number.isFinite(yMin)) {
-            yMin = bounds.yMin.value - 2;
+            yMin = getValue(bounds.yMin) - 2;
           }
           if (!Number.isFinite(xMax)) {
-            xMax = bounds.xMax.value + 2;
+            xMax = getValue(bounds.xMax) + 2;
           }
           if (!Number.isFinite(yMax)) {
-            yMax = bounds.yMax.value + 2;
+            yMax = getValue(bounds.yMax) + 2;
           }
           setVariable(`x_{${graphId}cam}`, (xMin - h).toString());
           setVariable(`y_{${graphId}cam}`, (yMin - k).toString());
@@ -233,32 +233,81 @@ export function createGraphWithBounds(graphId: number, graphType: GraphTypeNames
   }
 }
 
-function main() {
+class App {
   MyCalc = new MyCalcClass(Calc);
-
-  const selections: SelectionObject[] = [];
-  let easySelections: {x: number, y: number}[] = [];
-  const graphAbbrev = ['C', 'HP', 'VP', 'E', 'HH', 'VH', 'LS'];
-  let easyMode = false;
-  let lastSelectedId = '';
-  let currentlyPressed: number[] = [];
-  let shadeIdSet = false;
-  let altTime = 0;
-  let ctrlTime = 0;
-  let expressionPos = { x: 0, y: 0 };
-  let shadeId = 1;
-  let currGraphName: GraphTypeNames = "circle";
-  let centerPoint = {
+  selections: SelectionObject[] = [];
+  easySelections: {x: number, y: number}[] = [];
+  graphAbbrev = ['C', 'HP', 'VP', 'E', 'HH', 'VH', 'LS'];
+  easyMode = false;
+  lastSelectedId = '';
+  currentlyPressed: number[] = [];
+  shadeIdSet = false;
+  altTime = 0;
+  ctrlTime = 0;
+  expressionPos = { x: 0, y: 0 };
+  shadeId = 1;
+  currGraphName: GraphTypeNames = "circle";
+  centerPoint = {
     x: Infinity,
     y: Infinity,
   };
 
-  let lastCenterPoint = {
+  lastCenterPoint = {
     x: Infinity,
     y: Infinity,
   };
+  shadingData: {
+    lastUpperBoundary: { x: Value, y: Value }
+    lastLowerBoundary: { x: Value, y: Value }
+  } = {
+    lastUpperBoundary: {
+      x: -Infinity,
+      y: -Infinity,
+    },
+    lastLowerBoundary: {
+      x: Infinity,
+      y: Infinity,
+    },
+  };
+  constructor() {
+    document.addEventListener('keydown', this.keyDownHandler, false);
+    document.addEventListener('keyup', this.keyUpHandler, false);
+    document.addEventListener('pointerup', this.mouseUpHandler, false);
 
-  function getShadeId() {
+    this.drawHtml(false)
+  
+    unsafeWindow.MyCalc = MyCalc;
+    unsafeWindow.Graph = Graph;
+    unsafeWindow.changeColor = this.changeColor;
+    unsafeWindow.changegraphType = this.changegraphType;
+    unsafeWindow.createConicHandler = this.createConicHandler;
+    unsafeWindow.deleteById = MyCalc.deleteById;
+    unsafeWindow.toggleArtist = this.toggleArtist;
+  }
+  drawHtml(shortcutButtons: boolean) {
+    const pillbox = unsafeWindow.document.querySelector('.dcg-overgraph-pillbox-elements');
+    if (pillbox) {
+      pillbox.insertAdjacentHTML('beforeend', '<div id="artist-button-container"><div class="dcg-tooltip-hit-area-container"><div class="dcg-btn-flat-gray dcg-settings-pillbox dcg-action-settings" role="button" onclick=\'toggleArtist()\' style="background:#ededed"><i class="dcg-icon-wrench" aria-hidden="true"></i></div></div><div style="display: none"></div></div>');
+      pillbox.insertAdjacentHTML('beforeend', '<div id="artist-container" class="dcg-artist-view-container"></div>');
+      const artistContainer = unsafeWindow.document.querySelector('#artist-container');
+      if (shortcutButtons) {
+        if (artistContainer) {
+          artistContainer.insertAdjacentHTML('beforeend', `<div class="dcg-tooltip-hit-area-container dcg-hovered"> <div id="artist-button" class="dcg-btn-flat-gray dcg-settings-pillbox dcg-action-settings dcg-hovered" role="button" oncontextmenu="createConicHandler();return false;" onclick="changegraphType()" style="background:#ededed">${"circle" /* graphAbbrev[currGraphId] */}</div></div>`);
+          artistContainer.insertAdjacentHTML('beforeend', '<div class="dcg-tooltip-hit-area-container dcg-hovered"> <div class="dcg-btn-flat-gray dcg-settings-pillbox dcg-action-settings dcg-hovered" role="button" onclick="deleteById(Calc.selectedExpressionId)" style="background:#ededed">X</div></div>');
+          artistContainer.insertAdjacentHTML('beforeend', '<div class="dcg-tooltip-hit-area-container dcg-hovered"> <div class="dcg-btn-flat-gray dcg-settings-pillbox dcg-action-settings dcg-hovered" role="button" onclick="hideCropLines(Calc.selectedExpressionId)" style="background:#ededed">H</div></div>');
+          artistContainer.insertAdjacentHTML('beforeend', '<div class="dcg-tooltip-hit-area-container dcg-hovered"> <div class="dcg-btn-flat-gray dcg-settings-pillbox dcg-action-settings dcg-hovered" role="button" onclick="changeCropMode(Calc.selectedExpressionId)" style="background:#ededed">Q</div></div>');
+          artistContainer.insertAdjacentHTML('beforeend', '<div class="dcg-tooltip-hit-area-container dcg-hovered"> <div class="dcg-btn-flat-gray dcg-settings-pillbox dcg-action-settings dcg-hovered" role="button" onclick="finalizeId(Calc.selectedExpressionId)" style="background:#ededed">F</div></div>');
+          artistContainer.insertAdjacentHTML('beforeend', '<div class="dcg-tooltip-hit-area-container dcg-hovered"> <div class="dcg-btn-flat-gray dcg-settings-pillbox dcg-action-settings dcg-hovered" role="button" oncontextmenu="freeze(false);return false;" style="background:#ededed">S</div></div>');
+        }
+      }
+    }
+  
+    const body = document.querySelector('.dcg-grapher');
+    if (body) {
+      body.insertAdjacentHTML('beforeend', '<div id="artist" style="position: absolute; bottom: 5%; right: 5%; padding: 10px; border: 1px solid black; border-radius: 10px"><form id="colorForm" onSubmit="return changeColor()"><div> Color <input name="color" type="color"></div><div> Opacity <input name="fillOpacity" type="number" min="0" max="1" value="0.4"></div><div><input type="button" value="Apply" onclick="changeColor()"></div></form></div>');
+    }
+  }
+  getShadeId() {
     return Math.max(...MyCalc
       .getExpressions()
       .filter((x) => x.id.startsWith('shade_'))
@@ -266,30 +315,18 @@ function main() {
       .map((x) => parseInt(x.id.split('_')[1], 10)), 0);
   }
 
-  const shadingData: {
-    [key: string]: { x: LinkedVariable, y: LinkedVariable }
-  } = {
-    lastUpperBoundary: {
-      x: MyCalc.linkedVariable(-Infinity),
-      y: MyCalc.linkedVariable(-Infinity),
-    },
-    lastLowerBoundary: {
-      x: MyCalc.linkedVariable(Infinity),
-      y: MyCalc.linkedVariable(Infinity),
-    },
-  };
 
-  function createDefaultConic(graphType: GraphTypeNames) {
+  createDefaultConic(graphType: GraphTypeNames) {
     const Class = GraphTypesByName[graphType]
     const coordinates = MyCalc.graphpaperBounds.mathCoordinates;
-    expressionPos = { x: parseFloat(((coordinates.left + coordinates.right) / 2).toFixed(MyCalc.precision)), y: parseFloat(((coordinates.top + coordinates.bottom) / 2).toFixed(MyCalc.precision)) };
+    this.expressionPos = { x: parseFloat(((coordinates.left + coordinates.right) / 2).toFixed(MyCalc.precision)), y: parseFloat(((coordinates.top + coordinates.bottom) / 2).toFixed(MyCalc.precision)) };
     const verticalSize = (coordinates.top - coordinates.bottom);
     const horizontalSize = (coordinates.right - coordinates.left);
     const size = Math.min(verticalSize, horizontalSize);
-    Class.setDefault(MyCalc.globalId, expressionPos, size)
+    Class.setDefault(MyCalc.globalId, this.expressionPos, size)
     if (Class.hasCenter) {
-      setVariable(`h_{${MyCalc.globalId}}`, expressionPos.x);
-      setVariable(`k_{${MyCalc.globalId}}`, expressionPos.y);
+      setVariable(`h_{${MyCalc.globalId}}`, this.expressionPos.x);
+      setVariable(`k_{${MyCalc.globalId}}`, this.expressionPos.y);
     }
     if (Class.hasCrop) {
       setVariable(`x_{${MyCalc.globalId}cam}`, -size * 0.4);
@@ -301,7 +338,200 @@ function main() {
     MyCalc.globalId += 1
   }
 
-  function freeze(force: boolean, append?: boolean) {
+
+  resetSelection() {
+    this.shadingData.lastUpperBoundary = { x: -Infinity, y: -Infinity };
+    this.shadingData.lastLowerBoundary = { x: Infinity, y: Infinity };
+  }
+
+  fixNegative() {
+    let toFix: Expression[] = [];
+    const allExpressions = MyCalc.getExpressions().filter(isBaseExpression)
+    const negativeab = allExpressions.filter((x) => /[ab]_{\d*\w+}=-\d+[.]{0,1}\d*/g.test(x.latex)); // Selects ellipse, hyperbola with negative a, b
+    toFix = [...toFix, ...negativeab.map((expression) => {
+      expression.latex.replaceAll('-', '');
+      return expression;
+    })];
+    MyCalc.updateExpressions(toFix);
+  }
+
+  changeCropMode(_id: string) {
+    if (_id.includes('_')) {
+      const graphId = _id.split('_')[0];
+      const idFilter = `${graphId}_`;
+      const filteredExpressions = MyCalc.getExpressions();
+      const baseExpressions = filteredExpressions.filter(isBaseExpression);
+      const idFilteredExpressions = baseExpressions.filter((x) => x.id.startsWith(idFilter))
+      const graphExpression = filteredExpressions.find((x) => x.id.endsWith('_0'));
+
+      if (!graphExpression) {
+        throw new Error();
+      } else if (!isBaseExpression(graphExpression)) {
+        throw new Error("Selected item is not a BaseExpression")
+      }
+
+      const conic = createGraphObject(graphExpression);
+      const { graphType } = conic;
+      // 0 - default (x and y), 1 - x only, 2 - y only, 3 - no crop
+      let cropType = conic.getCropType();
+      cropType = (cropType + 1) % 4;
+      [conic.latex] = conic.latex.split('\\left\\{');
+      const addition = (cropType < 2 ? '\\left\\{x_{1ca}<x<x_{1cb}\\right\\}' : '') + (!(cropType % 2) ? '\\left\\{y_{1ca}<y<y_{1cb}\\right\\}' : '');
+      conic.latex += addition.replaceAll('_{1', `_{${graphId}`);
+      const xBoundary = typeFilter(idFilteredExpressions, graphType, ['x']); // x only domain
+      const yBoundary = typeFilter(idFilteredExpressions, graphType, ['y']); // y only domain
+      const xyPoints = typeFilter(idFilteredExpressions, graphType, ['xy']); // points
+      const expressionsToSet = [];
+      for (let i = 0; i < xBoundary.length; i++) {
+        const expression = xBoundary[i];
+        expression.hidden = (cropType % 2 === 1);
+        expressionsToSet.push(expression);
+      }
+      for (let i = 0; i < yBoundary.length; i++) {
+        const expression = yBoundary[i];
+        expression.hidden = (cropType > 1);
+        expressionsToSet.push(expression);
+      }
+      for (let i = 0; i < xyPoints.length; i++) {
+        const expression = xyPoints[i];
+        expression.hidden = (cropType === 3);
+        expressionsToSet.push(expression);
+      }
+      expressionsToSet.push(conic);
+      MyCalc.updateExpressions(expressionsToSet);
+    }
+  }
+
+  setId() {
+    const baseId = Math.max(0, Math.max(...MyCalc.getExpressions()
+      .filter((x) => x.id.endsWith('_0'))
+      .map((x) => parseInt(x.id.split('_')[0], 10))
+      .filter((x) => !Number.isNaN(x)))) + 1;
+
+    const finalId = Math.max(0, Math.max(...MyCalc.getExpressions()
+      .filter((x) => x.id.startsWith('final_'))
+      .map((x) => parseInt(x.id.split('_')[1], 10))
+      .filter((x) => !Number.isNaN(x)))) + 1;
+    MyCalc.globalId = Math.max(baseId, finalId);
+  }
+  shadeToBack() {
+    const state = MyCalc.getState();
+    state.expressions.list = state.expressions.list
+      .filter((x) => x.id.startsWith('shade_'))
+      .concat(state.expressions.list.filter((x) => !x.id.startsWith('shade_')));
+    MyCalc.setState(state);
+  }
+
+  toggleShading() {
+    const baseExpressions = MyCalc.getExpressions().filter(isBaseExpression);
+    const shade = baseExpressions.filter((x) => x.id.startsWith('shade_'))
+    const newState = !shade[0].hidden;
+    MyCalc.updateExpressions(shade.map((_x) => {
+      const x = _x;
+      x.hidden = newState;
+      return x;
+    }));
+  }
+  getBoundsById(_id: string) {
+    const graphExpression = MyCalc.getExpression(_id)
+    if (graphExpression) {
+      if (isBaseExpression(graphExpression)) {
+        console.log((createGraphObject(graphExpression))
+          .getRealBounds());
+      }
+    }
+  }
+  expressionToFront(id: IdParts) {
+    const state = MyCalc.getState();
+    const expression = state.expressions.list
+      .filter((_expression) => _expression.id === id.id);
+    const multipleExpressions = state.expressions.list
+      .filter((_expression) => _expression.id !== id.id);
+    state.expressions.list = expression.concat(multipleExpressions);
+    MyCalc.setState(state);
+  }
+  keyUpHandler(e: KeyboardEvent) {
+    if (MyCalc) MyCalc.updateLinkedVariables()
+    MyCalc.updateVariables();
+    this.setId();
+    if (this.currentlyPressed.includes(e.keyCode)) {
+      this.currentlyPressed = this.currentlyPressed.filter((key) => key !== e.keyCode);
+    }
+    if (e.ctrlKey && e.shiftKey) {
+      const { key } = e;
+      if (key === '<') {
+        if (MyCalc.selectedExpressionId) {
+          this.expressionToFront(getIdParts(MyCalc.selectedExpressionId));
+        }
+      }
+      if (key === 'F') { // F - Finalize
+        if (MyCalc.selectedExpressionId) {
+          finalizeId(getIdParts(MyCalc.selectedExpressionId));
+        }
+      }
+    }
+    if (e.key === 'Control') {
+      this.ctrlTime = Date.now();
+    }
+    if (e.key === 'Alt') {
+      this.altTime = Date.now();
+    }
+    if (e.ctrlKey || (Date.now() - this.ctrlTime) < 100) {
+      this.ctrlTime = Date.now();
+      const { key } = e;
+    }
+    if (e.altKey || (Date.now() - this.altTime) < 100) {
+      this.altTime = Date.now();
+      const { keyCode } = e;
+      if (keyCode === 71) {
+        if (MyCalc.selectedExpressionId) {
+          transformBezier(MyCalc.selectedExpressionId)
+        }
+      }
+      if (keyCode === 87) {
+        const selection = this.selections.pop();
+      }
+      if (keyCode === 77) {
+        if (MyCalc.selectedExpressionId) {
+          this.getBoundsById(MyCalc.selectedExpressionId);
+        }
+      }
+      if (keyCode === 219) {
+        this.fixNegative();
+      }
+      if (keyCode === 189) {
+        this.shadeToBack();
+      } else if (keyCode === 187) {
+        this.toggleShading();
+      } else if ((keyCode >= 49) && (keyCode <= 56)) {
+        this.createDefaultConic(GraphTypeIdToName[keyCode - 49]);
+      } else if (keyCode === 83) { // bottom
+        this.resetSelection();
+      } else if (keyCode === 48) {
+        this.freeze(e.shiftKey, e.ctrlKey);
+      } else if (keyCode === 88) {
+        if (MyCalc.selectedExpressionId) MyCalc.deleteById(MyCalc.selectedExpressionId);
+      } else if (keyCode === 81) {
+        if (MyCalc.selectedExpressionId) this.changeCropMode(MyCalc.selectedExpressionId);
+      } else if (keyCode === 72) {
+        if (MyCalc.selectedExpressionId) hideCropLines(getIdParts(MyCalc.selectedExpressionId));
+      } else if (keyCode === 70) {
+        this.easyMode = !this.easyMode;
+      }
+    }
+    e.preventDefault();
+  }
+
+  keyDownHandler(e: KeyboardEvent) {
+    if (MyCalc) MyCalc.updateLinkedVariables()
+    if (e.altKey) {
+      if (!this.currentlyPressed.includes(e.keyCode)) {
+        this.currentlyPressed.push(e.keyCode);
+      }
+    }
+  }
+
+  freeze(force: boolean, append?: boolean) {
     let newId = 1;
     const numExpressions = MyCalc.getItemCount()    
     if (append) {
@@ -309,7 +539,7 @@ function main() {
       if (expressionsString) {
         const expressions: Expression[] = JSON.parse(expressionsString);
         let newId = MyCalc.globalId
-        let newShadeId = shadeId
+        let newShadeId = this.shadeId
         const baseExpressions = expressions.filter(isBaseExpression)
         const newExpressions: BaseExpression[] = []
         baseExpressions.forEach((_expression) => {
@@ -329,7 +559,7 @@ function main() {
         })
         MyCalc.setExpressions(newExpressions)
         MyCalc.globalId = newId
-        shadeId = newShadeId
+        this.shadeId = newShadeId
       }
     } else {
       if (numExpressions !== 1) {
@@ -408,199 +638,7 @@ function main() {
     }
   }
 
-  function resetSelection() {
-    shadingData.lastUpperBoundary = { x: MyCalc.linkedVariable(-Infinity), y: MyCalc.linkedVariable(-Infinity) };
-    shadingData.lastLowerBoundary = { x: MyCalc.linkedVariable(Infinity), y: MyCalc.linkedVariable(Infinity) };
-  }
-
-  function fixNegative() {
-    let toFix: Expression[] = [];
-    const allExpressions = MyCalc.getExpressions().filter(isBaseExpression)
-    const negativeab = allExpressions.filter((x) => /[ab]_{\d*\w+}=-\d+[.]{0,1}\d*/g.test(x.latex)); // Selects ellipse, hyperbola with negative a, b
-    toFix = [...toFix, ...negativeab.map((expression) => {
-      expression.latex.replaceAll('-', '');
-      return expression;
-    })];
-    MyCalc.updateExpressions(toFix);
-  }
-
-  function changeCropMode(_id: string) {
-    if (_id.includes('_')) {
-      const graphId = _id.split('_')[0];
-      const idFilter = `${graphId}_`;
-      const filteredExpressions = MyCalc.getExpressions();
-      const baseExpressions = filteredExpressions.filter(isBaseExpression);
-      const idFilteredExpressions = baseExpressions.filter((x) => x.id.startsWith(idFilter))
-      const graphExpression = filteredExpressions.find((x) => x.id.endsWith('_0'));
-
-      if (!graphExpression) {
-        throw new Error();
-      } else if (!isBaseExpression(graphExpression)) {
-        throw new Error("Selected item is not a BaseExpression")
-      }
-
-      const conic = createGraphObject(graphExpression);
-      const { graphType } = conic;
-      // 0 - default (x and y), 1 - x only, 2 - y only, 3 - no crop
-      let cropType = conic.getCropType();
-      cropType = (cropType + 1) % 4;
-      [conic.latex] = conic.latex.split('\\left\\{');
-      const addition = (cropType < 2 ? '\\left\\{x_{1ca}<x<x_{1cb}\\right\\}' : '') + (!(cropType % 2) ? '\\left\\{y_{1ca}<y<y_{1cb}\\right\\}' : '');
-      conic.latex += addition.replaceAll('_{1', `_{${graphId}`);
-      const xBoundary = typeFilter(idFilteredExpressions, graphType, ['x']); // x only domain
-      const yBoundary = typeFilter(idFilteredExpressions, graphType, ['y']); // y only domain
-      const xyPoints = typeFilter(idFilteredExpressions, graphType, ['xy']); // points
-      const expressionsToSet = [];
-      for (let i = 0; i < xBoundary.length; i++) {
-        const expression = xBoundary[i];
-        expression.hidden = (cropType % 2 === 1);
-        expressionsToSet.push(expression);
-      }
-      for (let i = 0; i < yBoundary.length; i++) {
-        const expression = yBoundary[i];
-        expression.hidden = (cropType > 1);
-        expressionsToSet.push(expression);
-      }
-      for (let i = 0; i < xyPoints.length; i++) {
-        const expression = xyPoints[i];
-        expression.hidden = (cropType === 3);
-        expressionsToSet.push(expression);
-      }
-      expressionsToSet.push(conic);
-      MyCalc.updateExpressions(expressionsToSet);
-    }
-  }
-
-  function setId() {
-    const baseId = Math.max(0, Math.max(...MyCalc.getExpressions()
-      .filter((x) => x.id.endsWith('_0'))
-      .map((x) => parseInt(x.id.split('_')[0], 10))
-      .filter((x) => !Number.isNaN(x)))) + 1;
-
-    const finalId = Math.max(0, Math.max(...MyCalc.getExpressions()
-      .filter((x) => x.id.startsWith('final_'))
-      .map((x) => parseInt(x.id.split('_')[1], 10))
-      .filter((x) => !Number.isNaN(x)))) + 1;
-    MyCalc.globalId = Math.max(baseId, finalId);
-  }
-  function shadeToBack() {
-    const state = MyCalc.getState();
-    state.expressions.list = state.expressions.list
-      .filter((x) => x.id.startsWith('shade_'))
-      .concat(state.expressions.list.filter((x) => !x.id.startsWith('shade_')));
-    MyCalc.setState(state);
-  }
-
-  function toggleShading() {
-    const baseExpressions = MyCalc.getExpressions().filter(isBaseExpression);
-    const shade = baseExpressions.filter((x) => x.id.startsWith('shade_'))
-    const newState = !shade[0].hidden;
-    MyCalc.updateExpressions(shade.map((_x) => {
-      const x = _x;
-      x.hidden = newState;
-      return x;
-    }));
-  }
-  function getBoundsById(_id: string) {
-    const graphExpression = MyCalc.getExpression(_id)
-    if (graphExpression) {
-      if (isBaseExpression(graphExpression)) {
-        console.log((createGraphObject(graphExpression))
-          .getRealBounds());
-      }
-    }
-  }
-  function expressionToFront(id: IdParts) {
-    const state = MyCalc.getState();
-    const expression = state.expressions.list
-      .filter((_expression) => _expression.id === id.id);
-    const multipleExpressions = state.expressions.list
-      .filter((_expression) => _expression.id !== id.id);
-    state.expressions.list = expression.concat(multipleExpressions);
-    MyCalc.setState(state);
-  }
-  function keyUpHandler(e: KeyboardEvent) {
-    if (MyCalc) MyCalc.updateLinkedVariables()
-    MyCalc.updateVariables();
-    setId();
-    if (currentlyPressed.includes(e.keyCode)) {
-      currentlyPressed = currentlyPressed.filter((key) => key !== e.keyCode);
-    }
-    if (e.ctrlKey && e.shiftKey) {
-      const { key } = e;
-      if (key === '<') {
-        if (MyCalc.selectedExpressionId) {
-          expressionToFront(getIdParts(MyCalc.selectedExpressionId));
-        }
-      }
-      if (key === 'F') { // F - Finalize
-        if (MyCalc.selectedExpressionId) {
-          finalizeId(getIdParts(MyCalc.selectedExpressionId));
-        }
-      }
-    }
-    if (e.key === 'Control') {
-      ctrlTime = Date.now();
-    }
-    if (e.key === 'Alt') {
-      altTime = Date.now();
-    }
-    if (e.ctrlKey || (Date.now() - ctrlTime) < 100) {
-      ctrlTime = Date.now();
-      const { key } = e;
-    }
-    if (e.altKey || (Date.now() - altTime) < 100) {
-      altTime = Date.now();
-      const { keyCode } = e;
-      if (keyCode === 71) {
-        if (MyCalc.selectedExpressionId) {
-          transformBezier(MyCalc.selectedExpressionId)
-        }
-      }
-      if (keyCode === 87) {
-        const selection = selections.pop();
-      }
-      if (keyCode === 77) {
-        if (MyCalc.selectedExpressionId) {
-          getBoundsById(MyCalc.selectedExpressionId);
-        }
-      }
-      if (keyCode === 219) {
-        fixNegative();
-      }
-      if (keyCode === 189) {
-        shadeToBack();
-      } else if (keyCode === 187) {
-        toggleShading();
-      } else if ((keyCode >= 49) && (keyCode <= 56)) {
-        createDefaultConic(GraphTypeIdToName[keyCode - 49]);
-      } else if (keyCode === 83) { // bottom
-        resetSelection();
-      } else if (keyCode === 48) {
-        freeze(e.shiftKey, e.ctrlKey);
-      } else if (keyCode === 88) {
-        if (MyCalc.selectedExpressionId) MyCalc.deleteById(MyCalc.selectedExpressionId);
-      } else if (keyCode === 81) {
-        if (MyCalc.selectedExpressionId) changeCropMode(MyCalc.selectedExpressionId);
-      } else if (keyCode === 72) {
-        if (MyCalc.selectedExpressionId) hideCropLines(getIdParts(MyCalc.selectedExpressionId));
-      } else if (keyCode === 70) {
-        easyMode = !easyMode;
-      }
-    }
-    e.preventDefault();
-  }
-
-  function keyDownHandler(e: KeyboardEvent) {
-    if (MyCalc) MyCalc.updateLinkedVariables()
-    if (e.altKey) {
-      if (!currentlyPressed.includes(e.keyCode)) {
-        currentlyPressed.push(e.keyCode);
-      }
-    }
-  }
-
-  function fillInside(id: string) {
+  fillInside(id: string) {
     const expression = MyCalc.getExpression(id)
     if (expression) {
       if (isBaseExpression(expression)) {
@@ -614,18 +652,18 @@ function main() {
           color: 'BLACK',
           hidden: false,
           type: "expression",
-          id: `shade_${shadeId}`,
+          id: `shade_${this.shadeId}`,
           latex: conic.latex,
           label: JSON.stringify({
             graphType: "shade"
           })
         });
-        shadeId += 1;
+        this.shadeId += 1;
       }
     }
   }
 
-  function fillIntersection(lowerId: string, upperId: string, axis: string, options?: {useValue: boolean}) {
+  fillIntersection(lowerId: string, upperId: string, axis: string, options?: {useValue: boolean}) {
     const lowerObject = MyCalc.getExpression(lowerId)
     const upperObject = MyCalc.getExpression(upperId)
 
@@ -643,28 +681,28 @@ function main() {
     const upperBounds = upperConic.getRealBounds();
 
     if (axis === 'y') {
-      let realMin = lowerBounds.xMin.value < upperBounds.xMin.value
+      let realMin = getValue(lowerBounds.xMin) < getValue(upperBounds.xMin)
         ? upperBounds.xMin : lowerBounds.xMin;
-      let realMax = lowerBounds.xMax.value > upperBounds.xMax.value
+      let realMax = getValue(lowerBounds.xMax) > getValue(upperBounds.xMax)
         ? upperBounds.xMax : lowerBounds.xMax;
 
-      if (Number.isFinite(lastCenterPoint.x)) {
-        if (shadingData.lastUpperBoundary.y.value > realMin.value && lastCenterPoint.x < centerPoint.x) { // To right
-          realMin = shadingData.lastUpperBoundary.y;
+      if (Number.isFinite(this.lastCenterPoint.x)) {
+        if (getValue(this.shadingData.lastUpperBoundary.y) > getValue(realMin) && this.lastCenterPoint.x < this.centerPoint.x) { // To right
+          realMin = this.shadingData.lastUpperBoundary.y;
         }
-        if (shadingData.lastLowerBoundary.y.value < realMax.value && lastCenterPoint.x > centerPoint.x) {
-          realMax = shadingData.lastLowerBoundary.y;
+        if (getValue(this.shadingData.lastLowerBoundary.y) < getValue(realMax) && this.lastCenterPoint.x > this.centerPoint.x) {
+          realMax = this.shadingData.lastLowerBoundary.y;
         }
       }
 
-      shadingData.lastUpperBoundary.y = realMax;
-      shadingData.lastLowerBoundary.y = realMin;
+      this.shadingData.lastUpperBoundary.y = realMax;
+      this.shadingData.lastLowerBoundary.y = realMin;
       const boundsObject = generateBounds(
-        realMin, MyCalc.linkedVariable(-Infinity), realMax, MyCalc.linkedVariable(Infinity),
+        realMin, -Infinity, realMax, Infinity,
       );
       let bounds: string;
       if (options?.useValue) {
-        bounds = boundsObject.value 
+        bounds = boundsObject.value
       } else {
         bounds = boundsObject.reference
       }
@@ -682,38 +720,38 @@ function main() {
             color: 'BLACK',
             hidden: false,
             type: "expression",
-            id: `shade_${shadeId}`,
+            id: `shade_${this.shadeId}`,
             latex: newExpression,
             fillOpacity: '1',
             label: JSON.stringify({
               graphType: "shade"
             })
           });
-          shadeId += 1;
+          this.shadeId += 1;
         }
       }
       MyCalc.setExpressions(newExpressions);
     } else if (axis === 'x') {
-      let realMin = lowerBounds.yMin.value < upperBounds.yMin.value
+      let realMin: Value = getValue(lowerBounds.yMin) < getValue(upperBounds.yMin)
         ? upperBounds.yMin : lowerBounds.yMin;
-      let realMax = lowerBounds.yMax.value > upperBounds.yMax.value
+      let realMax: Value = getValue(lowerBounds.yMax) > getValue(upperBounds.yMax)
         ? upperBounds.yMax : lowerBounds.yMax;
 
-      if (Number.isFinite(lastCenterPoint.y)) {
-        if (shadingData.lastUpperBoundary.x.value > realMin.value && lastCenterPoint.y < centerPoint.y) {
-          realMin = shadingData.lastUpperBoundary.x;
+      if (Number.isFinite(this.lastCenterPoint.y)) {
+        if (getValue(this.shadingData.lastUpperBoundary.x) > getValue(realMin) && this.lastCenterPoint.y < this.centerPoint.y) {
+          realMin = this.shadingData.lastUpperBoundary.x;
         }
-        if (shadingData.lastLowerBoundary.x.value < realMax.value && lastCenterPoint.y > centerPoint.y) {
-          realMax = shadingData.lastLowerBoundary.x;
+        if (getValue(this.shadingData.lastLowerBoundary.x) < getValue(realMax) && this.lastCenterPoint.y > this.centerPoint.y) {
+          realMax = this.shadingData.lastLowerBoundary.x;
         }
       }
 
-      shadingData.lastUpperBoundary.x = realMax;
-      shadingData.lastLowerBoundary.x = realMin;
-      const boundsObject = generateBounds(MyCalc.linkedVariable(-Infinity), realMin, MyCalc.linkedVariable(Infinity), realMax);
+      this.shadingData.lastUpperBoundary.x = realMax;
+      this.shadingData.lastLowerBoundary.x = realMin;
+      const boundsObject = generateBounds(-Infinity, realMin, Infinity, realMax);
       let bounds: string;
       if (options?.useValue) {
-        bounds = boundsObject.value 
+        bounds = boundsObject.value
       } else {
         bounds = boundsObject.reference
       }
@@ -731,30 +769,30 @@ function main() {
             color: 'BLACK',
             hidden: false,
             type: "expression",
-            id: `shade_${shadeId}`,
+            id: `shade_${this.shadeId}`,
             latex: newExpression,
             label: JSON.stringify({
               graphType: "shade"
             })
           });
-          shadeId += 1;
+          this.shadeId += 1;
         }
       }
       MyCalc.setExpressions(newExpressions);
     }
   }
-  function mouseUpHandler(e: PointerEvent) {
+  mouseUpHandler(e: PointerEvent) {
     if (MyCalc) MyCalc.updateLinkedVariables()
-    setId();
+    this.setId();
     if (MyCalc.selectedExpressionId) {
-      lastSelectedId = MyCalc.selectedExpressionId;
+      this.lastSelectedId = MyCalc.selectedExpressionId;
     }
     MyCalc.updateVariables();
-    if (!shadeIdSet) {
-      shadeId = getShadeId() + 1;
-      shadeIdSet = true;
+    if (!this.shadeIdSet) {
+      this.shadeId = this.getShadeId() + 1;
+      this.shadeIdSet = true;
     }
-    if (easyMode) {
+    if (this.easyMode) {
       // if (easySelections.length > 4) {
       //   easySelections.pop()
       // }
@@ -766,34 +804,34 @@ function main() {
             x: e.clientX,
             y: e.clientY,
           }))
-          easySelections.push({
-            x: point.x.value,
-            y: point.y.value,
+          this.easySelections.push({
+            x: getValue(point.x),
+            y: getValue(point.y),
           })
         } else {
-          easySelections.push(MyCalc.pixelsToMath({ x: e.clientX, y: e.clientY }));
+          this.easySelections.push(MyCalc.pixelsToMath({ x: e.clientX, y: e.clientY }));
         }
       }
-      console.log(easySelections, e.button)
+      console.log(this.easySelections, e.button)
       if (e.button == 1) {
-        if (easySelections.length === 1) {
+        if (this.easySelections.length === 1) {
 
         } 
-        if (easySelections.length === 2) {
-          createLineSegment(easySelections[0], easySelections[1], MyCalc.globalId, {finalize: true})
+        if (this.easySelections.length === 2) {
+          createLineSegment(this.easySelections[0], this.easySelections[1], MyCalc.globalId, {finalize: true})
         }
-        if (easySelections.length === 4) {
+        if (this.easySelections.length === 4) {
           createBezier({
-            p1: easySelections[0],
-            p2: easySelections[1],
-            p3: easySelections[2],
-            p4: easySelections[3],
+            p1: this.easySelections[0],
+            p2: this.easySelections[1],
+            p3: this.easySelections[2],
+            p4: this.easySelections[3],
           },
             MyCalc.globalId
           )
           // MyCalc.regression(easySelections)
         }
-        easySelections = []
+        this.easySelections = []
       }
     } else {
       if (e.button === 1) {
@@ -802,20 +840,20 @@ function main() {
           // const {xMin, xMax, yMin, yMax} = parseDomains(getDomainsFromLatex(shade.latex))
         })
       }
-      if (currentlyPressed.includes(65)) {
+      if (this.currentlyPressed.includes(65)) {
         const selected = MyCalc.getSelected();
         if (selected && isGraph(selected)) {
-          selections.push({ id: selected.id, pos: MyCalc.pixelsToMath({ x: e.clientX, y: e.clientY }) });
+          this.selections.push({ id: selected.id, pos: MyCalc.pixelsToMath({ x: e.clientX, y: e.clientY }) });
         }
-        if (selections.length >= 2) {
-          const lowerSelection = selections.shift();
-          const upperSelection = selections.shift();
+        if (this.selections.length >= 2) {
+          const lowerSelection = this.selections.shift();
+          const upperSelection = this.selections.shift();
 
           if (!upperSelection || !lowerSelection) {
             throw new Error("This shouldn't happen");
           }
 
-          centerPoint = {
+          this.centerPoint = {
             x: (upperSelection.pos.x + lowerSelection.pos.x) / 2,
             y: (upperSelection.pos.x + lowerSelection.pos.y) / 2,
           };
@@ -836,7 +874,7 @@ function main() {
               lowerId = `${lowerIdParts.graphId}_0`;
             }
             const newLowerIdParts = getIdParts(lowerId)
-            fillInside(lowerId);
+            this.fillInside(lowerId);
             if (newLowerIdParts.isEditable && lowerIdParts.isFinal) finalize(newLowerIdParts);
           } else {
             if (lowerIdParts.isFinal) {
@@ -849,21 +887,17 @@ function main() {
             }
             const newLowerIdParts = getIdParts(lowerId)
             const newUpperIdParts = getIdParts(upperId)
-            fillIntersection(lowerId, upperId, axis, {useValue: true});
+            this.fillIntersection(lowerId, upperId, axis, {useValue: true});
             if (newLowerIdParts.isEditable && lowerIdParts.isFinal) MyCalc.removeExpressionById(lowerId);
             if (newUpperIdParts.isEditable && upperIdParts.isFinal) MyCalc.removeExpressionById(upperId);
           }
-          lastCenterPoint = centerPoint;
+          this.lastCenterPoint = this.centerPoint;
         }
       }
     }
   }
 
-  document.addEventListener('keydown', keyDownHandler, false);
-  document.addEventListener('keyup', keyUpHandler, false);
-  document.addEventListener('pointerup', mouseUpHandler, false);
-
-  function toggleArtist() {
+  toggleArtist() {
     const x: HTMLElement = document.querySelector('#artist') as HTMLElement;
     const y: HTMLElement = document.querySelector('#artist-container') as HTMLElement;
 
@@ -871,8 +905,8 @@ function main() {
     if (y) y.style.display = y.style.display === 'none' ? 'block' : 'none';
   }
 
-  function changeColor() {
-    const graphExpression = MyCalc.getExpression(lastSelectedId);
+  changeColor() {
+    const graphExpression = MyCalc.getExpression(this.lastSelectedId);
     if (graphExpression && isBaseExpression(graphExpression)) {
       const colorForm = $('#colorForm');
       if (colorForm) {
@@ -884,9 +918,9 @@ function main() {
     }
   }
 
-  function changegraphType() {
+  changegraphType() {
     // currGraphId = (currGraphId + 1) % 7;
-    currGraphName = "circle"
+    this.currGraphName = "circle"
     const button = document.querySelector('#artist-button');
     if (button) {
       // button.innerHTML = graphAbbrev[currGraphId];
@@ -894,46 +928,14 @@ function main() {
     }
   }
 
-  function createConicHandler() {
-    createDefaultConic(currGraphName);
+  createConicHandler() {
+    this.createDefaultConic(this.currGraphName);
   }
-
-  const shortcutButtons = false
-
-  const pillbox = unsafeWindow.document.querySelector('.dcg-overgraph-pillbox-elements');
-  if (pillbox) {
-    pillbox.insertAdjacentHTML('beforeend', '<div id="artist-button-container"><div class="dcg-tooltip-hit-area-container"><div class="dcg-btn-flat-gray dcg-settings-pillbox dcg-action-settings" role="button" onclick=\'toggleArtist()\' style="background:#ededed"><i class="dcg-icon-wrench" aria-hidden="true"></i></div></div><div style="display: none"></div></div>');
-    pillbox.insertAdjacentHTML('beforeend', '<div id="artist-container" class="dcg-artist-view-container"></div>');
-    const artistContainer = unsafeWindow.document.querySelector('#artist-container');
-    if (shortcutButtons) {
-      if (artistContainer) {
-        artistContainer.insertAdjacentHTML('beforeend', `<div class="dcg-tooltip-hit-area-container dcg-hovered"> <div id="artist-button" class="dcg-btn-flat-gray dcg-settings-pillbox dcg-action-settings dcg-hovered" role="button" oncontextmenu="createConicHandler();return false;" onclick="changegraphType()" style="background:#ededed">${"circle" /* graphAbbrev[currGraphId] */}</div></div>`);
-        artistContainer.insertAdjacentHTML('beforeend', '<div class="dcg-tooltip-hit-area-container dcg-hovered"> <div class="dcg-btn-flat-gray dcg-settings-pillbox dcg-action-settings dcg-hovered" role="button" onclick="deleteById(Calc.selectedExpressionId)" style="background:#ededed">X</div></div>');
-        artistContainer.insertAdjacentHTML('beforeend', '<div class="dcg-tooltip-hit-area-container dcg-hovered"> <div class="dcg-btn-flat-gray dcg-settings-pillbox dcg-action-settings dcg-hovered" role="button" onclick="hideCropLines(Calc.selectedExpressionId)" style="background:#ededed">H</div></div>');
-        artistContainer.insertAdjacentHTML('beforeend', '<div class="dcg-tooltip-hit-area-container dcg-hovered"> <div class="dcg-btn-flat-gray dcg-settings-pillbox dcg-action-settings dcg-hovered" role="button" onclick="changeCropMode(Calc.selectedExpressionId)" style="background:#ededed">Q</div></div>');
-        artistContainer.insertAdjacentHTML('beforeend', '<div class="dcg-tooltip-hit-area-container dcg-hovered"> <div class="dcg-btn-flat-gray dcg-settings-pillbox dcg-action-settings dcg-hovered" role="button" onclick="finalizeId(Calc.selectedExpressionId)" style="background:#ededed">F</div></div>');
-        artistContainer.insertAdjacentHTML('beforeend', '<div class="dcg-tooltip-hit-area-container dcg-hovered"> <div class="dcg-btn-flat-gray dcg-settings-pillbox dcg-action-settings dcg-hovered" role="button" oncontextmenu="freeze(false);return false;" style="background:#ededed">S</div></div>');
-      }
-    }
-  }
-
-  const body = document.querySelector('.dcg-grapher');
-  if (body) {
-    body.insertAdjacentHTML('beforeend', '<div id="artist" style="position: absolute; bottom: 5%; right: 5%; padding: 10px; border: 1px solid black; border-radius: 10px"><form id="colorForm" onSubmit="return changeColor()"><div> Color <input name="color" type="color"></div><div> Opacity <input name="fillOpacity" type="number" min="0" max="1" value="0.4"></div><div><input type="button" value="Apply" onclick="changeColor()"></div></form></div>');
-  }
-
-  unsafeWindow.MyCalc = MyCalc;
-  unsafeWindow.Graph = Graph;
-  unsafeWindow.changeColor = changeColor;
-  unsafeWindow.changegraphType = changegraphType;
-  unsafeWindow.createConicHandler = createConicHandler;
-  unsafeWindow.deleteById = MyCalc.deleteById;
-  unsafeWindow.toggleArtist = toggleArtist;
 }
 
 (async () => {
   while (typeof Calc === 'undefined') {
     await new Promise((resolve) => setTimeout(resolve, 1000));
   }
-  main();
+  const app = new App();
 })();

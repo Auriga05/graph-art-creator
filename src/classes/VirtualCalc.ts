@@ -1,10 +1,10 @@
 import { Expression } from "../types/types";
 
 export class VirtualCalc {
-	expressions: Expression[]
-	variables: {[key: string]: string};
+	expressions: {[key: string]: Expression}
+	variables: {[key: string]: string}
 	constructor() {
-		this.expressions = []
+		this.expressions = {}
 		this.variables = {}
 	}
 
@@ -14,11 +14,11 @@ export class VirtualCalc {
 		)
 		const expressionIds = new Set(expressions.map(expression => expression.id))
 		const updates: {index: number, id: string}[] = []
-		this.expressions.forEach((expression, index) => {
-			if (expressionIds.has(expression.id)) {
+		Object.entries(this.expressions).forEach((expression, index) => {
+			if (expressionIds.has(expression[0])) {
 				updates.push({
 					index, // existing
-					id: expression.id, // id
+					id: expression[0], // id
 				})
 			}
 		})
@@ -26,9 +26,14 @@ export class VirtualCalc {
 			this.expressions[update.index] = expressionsObject[update.id]
 		})
 		expressionIds.forEach((expressionId) => {
-			this.expressions.push(expressionsObject[expressionId])
+			this.expressions[expressionId] = expressionsObject[expressionId]
 		})
 		console.log(this.expressions)
+	}
+
+	removeExpressions(expressions: Partial<Expression>[]) {
+		const expressionIds = new Set(expressions.map(expression => expression.id))
+		this.expressions = Object.fromEntries(Object.entries(this.expressions).filter(entry => !expressionIds.has(entry[0])))
 	}
 
 	setVariables(variables: {key: string, value: string}[]) {

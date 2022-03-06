@@ -1,7 +1,7 @@
 import { getGraphTypeFromStandard } from "../actions/convertFromStandard";
 import { Bezier } from "../graphs/Bezier";
 import { createGraphWithBounds, MyCalc } from "../index.user";
-import { BaseExpression, EditableIdParts, Expression, FinalIdParts, GraphingOptions, GraphTypeNames, GraphTypes, GraphTypesByName, IdParts, InputBaseExpression, InvalidIdParts, MinBaseExpression, ShadeIdParts } from "../types/types";
+import { BaseExpression, EditableIdParts, Expression, FinalIdParts, GraphingOptions, GraphTypeNames, GraphTypes, GraphTypesByName, IdParts, InputBaseExpression, InvalidIdParts, MinBaseExpression, ShadeIdParts, Value } from "../types/types";
 import { evaluateBezier, getCriticalPoints } from "./bezierLib";
 import { getConicFit } from "./conicLib";
 import { Coordinate } from "./mathLib";
@@ -277,26 +277,30 @@ export function parseDomains(domains: string[]) {
   return { xMin, xMax, yMin, yMax };
 }
 
-export function maxLinkedVariable(linkedVariables: LinkedVariable[]) {
-  let maxVariable = MyCalc.linkedVariable(-Infinity);
+export function maxValue(linkedVariables: Value[]): Value {
+  let currValue: Value = -Infinity;
   linkedVariables.forEach((variable) => {
-    maxVariable = variable.value > maxVariable.value ? variable : maxVariable;
+    if (getValue(variable) > currValue) {
+      currValue = variable
+    }
   });
-  return maxVariable;
+  return currValue;
 }
 
-export function minLinkedVariable(linkedVariables: LinkedVariable[]) {
-  let minVariable = MyCalc.linkedVariable(Infinity);
+export function minValue(linkedVariables: Value[]) {
+  let currValue: Value = Infinity;
   linkedVariables.forEach((variable) => {
-    minVariable = variable.value < minVariable.value ? variable : minVariable;
+    if (getValue(variable) < currValue) {
+      currValue = variable
+    }
   });
-  return minVariable;
+  return currValue;
 }
 
 export function minMax(variables: LinkedVariable[]) {
   return {
-    min: minLinkedVariable(variables),
-    max: maxLinkedVariable(variables),
+    min: minValue(variables),
+    max: maxValue(variables),
   };
 }
 
@@ -320,49 +324,42 @@ export function substitute(_latex: string) {
 }
 
 export function generateBounds(
-  _xMin: LinkedVariable,
-  _yMin: LinkedVariable,
-  _xMax: LinkedVariable,
-  _yMax: LinkedVariable,
+  _xMin: Value,
+  _yMin: Value,
+  _xMax: Value,
+  _yMax: Value,
 ) {
-  const xMin = _xMin;
-  xMin.value = parseFloat(xMin.value.toFixed(MyCalc.precision));
-
-  const yMin = _yMin;
-  yMin.value = parseFloat(yMin.value.toFixed(MyCalc.precision));
-
-  const xMax = _xMax;
-  xMax.value = parseFloat(xMax.value.toFixed(MyCalc.precision));
-
-  const yMax = _yMax;
-  yMax.value = parseFloat(yMax.value.toFixed(MyCalc.precision));
+  const xMin = setValue(_xMin, parseFloat(getValue(_xMin).toFixed(MyCalc.precision)));
+  const yMin = setValue(_yMin, parseFloat(getValue(_yMin).toFixed(MyCalc.precision)));
+  const xMax = setValue(_xMax, parseFloat(getValue(_xMax).toFixed(MyCalc.precision)));
+  const yMax = setValue(_yMax, parseFloat(getValue(_yMax).toFixed(MyCalc.precision)));
 
   const xBounds = { value: '', reference: '' };
   const yBounds = { value: '', reference: '' };
-  if (xMin.value === -Infinity) {
-    if (xMax.value !== Infinity) {
-      xBounds.value = `\\left\\{x<${xMax.value}\\right\\}`;
-      xBounds.reference = `\\left\\{x<${xMax.reference}\\right\\}`;
+  if (getValue(xMin) === -Infinity) {
+    if (getValue(xMax) !== Infinity) {
+      xBounds.value = `\\left\\{x<${getValue(xMax)}\\right\\}`;
+      xBounds.reference = `\\left\\{x<${getReference(xMax)}\\right\\}`;
     }
-  } else if (xMax.value === Infinity) {
-    xBounds.value = `\\left\\{${xMin.value}<x\\right\\}`;
-    xBounds.reference = `\\left\\{${xMin.reference}<x\\right\\}`;
+  } else if (getValue(xMax) === Infinity) {
+    xBounds.value = `\\left\\{${getValue(xMin)}<x\\right\\}`;
+    xBounds.reference = `\\left\\{${getReference(xMin)}<x\\right\\}`;
   } else {
-    xBounds.value = `\\left\\{${xMin.value}<x<${xMax.value}\\right\\}`;
-    xBounds.reference = `\\left\\{${xMin.reference}<x<${xMax.reference}\\right\\}`;
+    xBounds.value = `\\left\\{${getValue(xMin)}<x<${getValue(xMax)}\\right\\}`;
+    xBounds.reference = `\\left\\{${getReference(xMin)}<x<${getReference(xMax)}\\right\\}`;
   }
 
-  if (yMin.value === -Infinity) {
-    if (yMax.value !== Infinity) {
-      yBounds.value = `\\left\\{y<${yMax.value}\\right\\}`;
-      yBounds.reference = `\\left\\{y<${yMax.reference}\\right\\}`;
+  if (getValue(yMin) === -Infinity) {
+    if (getValue(yMax) !== Infinity) {
+      yBounds.value = `\\left\\{y<${getValue(yMax)}\\right\\}`;
+      yBounds.reference = `\\left\\{y<${getReference(yMax)}\\right\\}`;
     }
-  } else if (yMax.value === Infinity) {
-    yBounds.value = `\\left\\{${yMin.value}<y\\right\\}`;
-    yBounds.reference = `\\left\\{${yMin.reference}<y\\right\\}`;
+  } else if (getValue(yMax) === Infinity) {
+    yBounds.value = `\\left\\{${getValue(yMin)}<y\\right\\}`;
+    yBounds.reference = `\\left\\{${getReference(yMin)}<y\\right\\}`;
   } else {
-    yBounds.value = `\\left\\{${yMin.value}<y<${yMax.value}\\right\\}`;
-    yBounds.reference = `\\left\\{${yMin.reference}<y<${yMax.reference}\\right\\}`;
+    yBounds.value = `\\left\\{${getValue(yMin)}<y<${getValue(yMax)}\\right\\}`;
+    yBounds.reference = `\\left\\{${getReference(yMin)}<y<${getReference(yMax)}\\right\\}`;
   }
   return { value: `${xBounds.value}${yBounds.value}`, reference: `${xBounds.reference}${yBounds.reference}` };
 }
@@ -395,7 +392,7 @@ export function substituteFromId(_latex: string, graphId: number) {
 export function setVariable(variable: string, _value: string | number | LinkedVariable) {
   let value = _value;
   if (value instanceof LinkedVariable) {
-    value = value.value.toString()
+    value = getValue(value).toString()
   } else if (typeof value === 'number') {
     value = value.toString();
   } else if (value == undefined) {
@@ -572,10 +569,10 @@ export function createLineSegment(p1: Coordinate, p2: Coordinate, id: number, op
     const xMax = Math.max(p1.x, p2.x)
     const yMax = Math.max(p1.y, p2.y)
     const bounds = generateBounds(
-      MyCalc.linkedVariable(parseFloat(xMin.toFixed(MyCalc.precision))),
-      MyCalc.linkedVariable(-Infinity),
-      MyCalc.linkedVariable(parseFloat(xMax.toFixed(MyCalc.precision))),
-      MyCalc.linkedVariable(Infinity),
+      parseFloat(xMin.toFixed(MyCalc.precision)),
+      -Infinity,
+      parseFloat(xMax.toFixed(MyCalc.precision)),
+      Infinity,
     ).value
     const m = parseFloat(((p1.y - p2.y) / (p1.x - p2.x)).toFixed(MyCalc.precision))
     const b = parseFloat((p1.y - m * p1.x).toFixed(MyCalc.precision))
@@ -716,4 +713,29 @@ export function substituteToAll(expressions: Expression[], graphId: number) {
     }
   }
   return expressionList
+}
+
+export function getValue(thing: Value) {
+  if (thing instanceof LinkedVariable) {
+    return thing.value
+  } else {
+    return thing
+  }
+}
+
+export function setValue(thing: Value, value: Value) {
+  if (thing instanceof LinkedVariable) {
+    thing.value = getValue(value)
+    return thing
+  } else {
+    return value
+  }
+}
+
+export function getReference(thing: Value) {
+  if (thing instanceof LinkedVariable) {
+    return thing.reference
+  } else {
+    return thing
+  }
 }

@@ -89,15 +89,15 @@ export type Expression = TableExpression | MinBaseExpression;
 // }
 
 export interface MinMax {
-  min: LinkedVariable;
-  max: LinkedVariable;
+  min: Value;
+  max: Value;
 }
 
 export interface Bounds {
-  xMin: LinkedVariable;
-  xMax: LinkedVariable;
-  yMin: LinkedVariable;
-  yMax: LinkedVariable;
+  xMin: Value;
+  xMax: Value;
+  yMin: Value;
+  yMax: Value;
 }
 
 export interface NumberBounds {
@@ -121,8 +121,8 @@ export interface LatexExpression {
 }
 
 export interface LinkedCoordinate {
-  x: LinkedVariable;
-  y: LinkedVariable;
+  x: Value;
+  y: Value;
 }
 
 export interface GeneralConicVariables {
@@ -196,3 +196,7 @@ export type GraphObjectData =
   | VerticalHyperbolaData
   | LineSegmentData
   | BezierData;
+
+export type Value = LinkedVariable | number
+
+export type BoundsValues = { xMin: Value, yMin: Value, xMax: Value, yMax: Value }

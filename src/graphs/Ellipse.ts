@@ -1,8 +1,8 @@
 import { Conic } from "../classes/Conic";
 import { Graph } from "../classes/Graph";
 import { MyCalc } from "../index.user";
-import { LinkedVariable, getVariable, simplify, substitute, generateBounds, getDomains, setVariable } from "../lib/lib";
-import { Bounds, InputBaseExpression, GeneralConicVariables } from "../types/types";
+import { LinkedVariable, getVariable, simplify, substitute, generateBounds, getDomains, setVariable, getValue } from "../lib/lib";
+import { Bounds, InputBaseExpression, GeneralConicVariables, Value } from "../types/types";
 
 export type EllipseVariables = {
   h: number,
@@ -106,16 +106,16 @@ export class Ellipse extends Graph implements Initializable, Conic {
   getEndpoints() {
     const { graphId } = this;
     const domains = getDomains(graphId);
-    let points: { x: LinkedVariable, y: LinkedVariable } [] = [];
+    let points: { x: Value, y: Value } [] = [];
     const variables = this.getConicVariables();
     const evaluations = this.evaluateBounds(variables, domains)
     const { h, k, a, b } = variables;
 
     points = [
-      { x: MyCalc.linkedVariable(`${h.reference}-${a.reference}`, h.value - a.value), y: k },
-      { x: h, y: MyCalc.linkedVariable(`${k.reference}-${b.reference}`, k.value - b.value) },
-      { x: MyCalc.linkedVariable(`${h.reference}+${a.reference}`, h.value + a.value), y: k },
-      { x: h, y: MyCalc.linkedVariable(`${k.reference}+${b.reference}`, k.value + b.value) },
+      { x: MyCalc.linkedVariable(`${h.reference}-${a.reference}`, getValue(h) - getValue(a)), y: k },
+      { x: h, y: MyCalc.linkedVariable(`${k.reference}-${b.reference}`, getValue(k) - getValue(b)) },
+      { x: MyCalc.linkedVariable(`${h.reference}+${a.reference}`, getValue(h) + getValue(a)), y: k },
+      { x: h, y: MyCalc.linkedVariable(`${k.reference}+${b.reference}`, getValue(k) + getValue(b)) },
     ];
 
     return {
@@ -131,12 +131,12 @@ export class Ellipse extends Graph implements Initializable, Conic {
     const h = getVariable(`h_{${graphId}}`);
     const k = getVariable(`k_{${graphId}}`);
     if (axis === 'x') {
-      if (h < xMax.value) relevantIndices.push(1);
-      if (xMin.value < h) relevantIndices.push(0);
+      if (h < getValue(xMax)) relevantIndices.push(1);
+      if (getValue(xMin) < h) relevantIndices.push(0);
     }
     if (axis === 'y') {
-      if (k < yMax.value) relevantIndices.push(1);
-      if (yMin.value < k) relevantIndices.push(0);
+      if (k < getValue(yMax)) relevantIndices.push(1);
+      if (getValue(yMin) < k) relevantIndices.push(0);
     }
     return relevantIndices;
   }

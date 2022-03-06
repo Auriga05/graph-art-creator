@@ -1,8 +1,8 @@
 import { Conic } from "../classes/Conic";
 import { Graph } from "../classes/Graph";
 import { MyCalc } from "../index.user";
-import { LinkedVariable, getVariable, simplify, substitute, getDomains, setVariable } from "../lib/lib";
-import { Bounds, InputBaseExpression, GeneralConicVariables } from "../types/types";
+import { LinkedVariable, getVariable, simplify, substitute, getDomains, setVariable, getValue } from "../lib/lib";
+import { Bounds, InputBaseExpression, GeneralConicVariables, Value } from "../types/types";
 
 export type HorizontalHyperbolaVariables = {
   h: number,
@@ -96,14 +96,14 @@ export class HorizontalHyperbola extends Graph implements Initializable, Conic {
 
   getEndpoints() {const { graphId } = this;
   const domains = getDomains(graphId);
-  let points: { x: LinkedVariable, y: LinkedVariable } [] = [];
+  let points: { x: Value, y: Value } [] = [];
   const variables = this.getConicVariables();
   const evaluations = this.evaluateBounds(variables, domains)
     const { h, k, a, b } = variables;
 
     points = [
-      { x: MyCalc.linkedVariable(`${h.reference}-${a.reference}`, h.value - a.value), y: k },
-      { x: MyCalc.linkedVariable(`${h.reference}+${a.reference}`, h.value + a.value), y: k },
+      { x: MyCalc.linkedVariable(`${h.reference}-${a.reference}`, getValue(h) - getValue(a)), y: k },
+      { x: MyCalc.linkedVariable(`${h.reference}+${a.reference}`, getValue(h) + getValue(a)), y: k },
     ];
 
     return {
@@ -121,12 +121,12 @@ export class HorizontalHyperbola extends Graph implements Initializable, Conic {
     const a = getVariable(`a_{${graphId}}`);
     // const b = getVariable(`b_{${graphId}}`);
     if (axis === 'x') {
-      if (xMax.value < h + a) relevantIndices.push(0);
-      if (xMin.value > h - a) relevantIndices.push(1);
+      if (getValue(xMax) < h + a) relevantIndices.push(0);
+      if (getValue(xMin) > h - a) relevantIndices.push(1);
     }
     if (axis === 'y') {
-      if (yMax.value < k) relevantIndices.push(0);
-      if (yMin.value > k) relevantIndices.push(1);
+      if (getValue(yMax) < k) relevantIndices.push(0);
+      if (getValue(yMin) > k) relevantIndices.push(1);
     }
     return relevantIndices;
   }

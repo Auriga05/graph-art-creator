@@ -1,8 +1,8 @@
 import { Conic } from "../classes/Conic";
 import { Graph } from "../classes/Graph";
 import { MyCalc } from "../index.user";
-import { LinkedVariable, getVariable, substitute, getDomains, minMax, minLinkedVariable, maxLinkedVariable, setVariable } from "../lib/lib";
-import { Bounds, InputBaseExpression, GeneralConicVariables } from "../types/types";
+import { LinkedVariable, getVariable, substitute, getDomains, minMax, minValue, maxValue, setVariable, getValue } from "../lib/lib";
+import { Bounds, InputBaseExpression, GeneralConicVariables, Value } from "../types/types";
 
 export type LineSegmentVariables = {
   m: number
@@ -87,7 +87,7 @@ export class LineSegment extends Graph implements Initializable, Conic {
   getEndpoints() {
     const { graphId } = this;
     const domains = getDomains(graphId);
-    const points: { x: LinkedVariable, y: LinkedVariable } [] = [];
+    const points: { x: Value, y: Value } [] = [];
     const variables = this.getConicVariables();
     const { x1, x2, y1, y2 } = variables;
     const xa = minMax([x1, x2]);
@@ -112,10 +112,10 @@ export class LineSegment extends Graph implements Initializable, Conic {
   getRealBounds() {
     const {x1, x2, y1, y2} = this.getGraphVariables()
 
-    const xMin = minLinkedVariable([x1, x2]);
-    const yMin = minLinkedVariable([y1, y2]);
-    const xMax = maxLinkedVariable([x1, x2]);
-    const yMax = maxLinkedVariable([y1, y2]);
+    const xMin = minValue([x1, x2]);
+    const yMin = minValue([y1, y2]);
+    const xMax = maxValue([x1, x2]);
+    const yMax = maxValue([y1, y2]);
     return { xMin, yMin, xMax, yMax };
   }
 
@@ -127,10 +127,10 @@ export class LineSegment extends Graph implements Initializable, Conic {
 
   static setGraphVariables(variables: LineSegmentVariables | {[Property in keyof LineSegmentVariables]: LinkedVariable}, graphId: number) {
     let { m, b, x1, x2 } = variables;
-    if (m instanceof LinkedVariable) m = m.value
-    if (b instanceof LinkedVariable) b = b.value
-    if (x1 instanceof LinkedVariable) x1 = x1.value
-    if (x2 instanceof LinkedVariable) x2 = x2.value
+    if (m instanceof LinkedVariable) m = getValue(m)
+    if (b instanceof LinkedVariable) b = getValue(b)
+    if (x1 instanceof LinkedVariable) x1 = getValue(x1)
+    if (x2 instanceof LinkedVariable) x2 = getValue(x2)
     const y1 = m * x1 + b;
     const y2 = m * x2 + b;
     setVariable(`x_{${graphId}a}`, x1.toString());
