@@ -1,39 +1,24 @@
-import { Expression } from "../types/types";
+import { CalcType, ControllerType } from "../types/desmosTypes";
+import { Expression, GraphTypes } from "../types/types";
+import { Graph } from "./Graph";
 
-export class VirtualCalc {
+export class VirtualCalcClass {
 	expressions: {[key: string]: Expression}
 	variables: {[key: string]: string}
-	constructor() {
+	lastId: number;
+	Calc: CalcType;
+	Controller: ControllerType;
+	constructor(_Calc: CalcType) {
 		this.expressions = {}
 		this.variables = {}
+		this.lastId = -1
+    this.Calc = _Calc;
+    this.Controller = _Calc.controller;
 	}
 
-	setExpressions(expressions: Expression[]) {
-		const expressionsObject: {[key: string]: Expression} = Object.fromEntries(
-			expressions.map((expression) => [expression.id, expression])
-		)
-		const expressionIds = new Set(expressions.map(expression => expression.id))
-		const updates: {index: number, id: string}[] = []
-		Object.entries(this.expressions).forEach((expression, index) => {
-			if (expressionIds.has(expression[0])) {
-				updates.push({
-					index, // existing
-					id: expression[0], // id
-				})
-			}
-		})
-		updates.forEach((update) => {
-			this.expressions[update.index] = expressionsObject[update.id]
-		})
-		expressionIds.forEach((expressionId) => {
-			this.expressions[expressionId] = expressionsObject[expressionId]
-		})
-		console.log(this.expressions)
-	}
-
-	removeExpressions(expressions: Partial<Expression>[]) {
-		const expressionIds = new Set(expressions.map(expression => expression.id))
-		this.expressions = Object.fromEntries(Object.entries(this.expressions).filter(entry => !expressionIds.has(entry[0])))
+	nextId() {
+		this.lastId += 1
+		return this.lastId
 	}
 
 	setVariables(variables: {key: string, value: string}[]) {
@@ -41,5 +26,14 @@ export class VirtualCalc {
 			const {key, value} = variable
 			this.variables[key] = value
 		})
+	}
+	
+	addGraph(graphType: "circle", variables: any) {
+		const newGraph = GraphTypes[graphType].addGraph(variables)
+		this.setFocus(newGraph)
+	}
+
+	setFocus(newGraph: Graph) {
+		newGraph.unstandardize()
 	}
 }

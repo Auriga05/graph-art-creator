@@ -1,38 +1,4 @@
-import { Bezier, BezierData } from "../graphs/Bezier";
-import { Circle, CircleData } from "../graphs/Circle";
-import { Ellipse, EllipseData } from "../graphs/Ellipse";
-import { HorizontalHyperbola, HorizontalHyperbolaData } from "../graphs/HorizontalHyperbola";
-import { HorizontalParabola, HorizontalParabolaData } from "../graphs/HorizontalParabola";
-import { LineSegment, LineSegmentData } from "../graphs/LineSegment";
-import { VerticalHyperbola, VerticalHyperbolaData } from "../graphs/VerticalHyperbola";
-import { VerticalParabola, VerticalParabolaData } from "../graphs/VerticalParabola";
-import { LinkedVariable } from "../lib/lib";
-
-export const GraphTypes = [
-  Circle,
-  HorizontalParabola,
-  VerticalParabola,
-  Ellipse,
-  HorizontalHyperbola,
-  VerticalHyperbola,
-  LineSegment,
-  Bezier,
-]
-
-export const GraphTypesByName = {
-  "circle": Circle,
-  "horizontal_parabola": HorizontalParabola,
-  "vertical_parabola": VerticalParabola,
-  "ellipse": Ellipse,
-  "horizontal_hyperbola": HorizontalHyperbola,
-  "vertical_hyperbola": VerticalHyperbola,
-  "line_segment": LineSegment,
-  "bezier": Bezier,
-}
-
-export const GraphTypeIdToName = Object.keys(GraphTypesByName) as GraphTypeNames[]
-
-export type GraphTypeNames = keyof typeof GraphTypesByName
+import { Circle } from "../graphs/Circle";
 
 interface TableColumnMin {
   hidden: boolean;
@@ -88,18 +54,6 @@ export type Expression = TableExpression | MinBaseExpression;
 //   type: string
 // }
 
-export interface MinMax {
-  min: Value;
-  max: Value;
-}
-
-export interface Bounds {
-  xMin: Value;
-  xMax: Value;
-  yMin: Value;
-  yMax: Value;
-}
-
 export interface NumberBounds {
   xMin: number;
   xMax: number;
@@ -107,22 +61,10 @@ export interface NumberBounds {
   yMax: number;
 }
 
-export interface Evaluations {
-  xa: MinMax;
-  xb: MinMax;
-  ya: MinMax;
-  yb: MinMax;
-}
-
 export interface LatexExpression {
   latex: string;
   types: string[];
   name?: string;
-}
-
-export interface LinkedCoordinate {
-  x: Value;
-  y: Value;
 }
 
 export interface GeneralConicVariables {
@@ -187,16 +129,8 @@ export type GraphingOptions = {
   set?: boolean;
 };
 
-export type GraphObjectData =
-  | CircleData
-  | HorizontalParabolaData
-  | VerticalParabolaData
-  | EllipseData
-  | HorizontalHyperbolaData
-  | VerticalHyperbolaData
-  | LineSegmentData
-  | BezierData;
+export const GraphTypes = {
+  "circle": Circle
+}
 
-export type Value = LinkedVariable | number
-
-export type BoundsValues = { xMin: Value, yMin: Value, xMax: Value, yMax: Value }
+export type GraphTypeName = keyof typeof GraphTypes
