@@ -1,4 +1,6 @@
+import { Graph } from "../classes/Graph";
 import { Circle } from "../graphs/Circle";
+import { Ellipse } from "../graphs/Ellipse";
 
 interface TableColumnMin {
   hidden: boolean;
@@ -42,7 +44,13 @@ export interface BaseExpression extends InputBaseExpression {
   label: string;
 }
 
-export type Expression = TableExpression | MinBaseExpression;
+export type PartialInputBaseExpression = Partial<{
+  color: string;
+  hidden: boolean;
+  label: string;
+}> & MinBaseExpression
+
+export type Expression = TableExpression | PartialInputBaseExpression;
 
 // export interface Expression {
 //   [key: string]: any;
@@ -129,8 +137,12 @@ export type GraphingOptions = {
   set?: boolean;
 };
 
-export const GraphTypes = {
-  "circle": Circle
-}
+const GraphTypesClass = [Circle, Ellipse]
 
-export type GraphTypeName = keyof typeof GraphTypes
+export const GraphTypes = Object.fromEntries(GraphTypesClass.map(graphType => [graphType.graphType, graphType]))
+export type GraphTypeName = typeof GraphTypesClass[number]["graphType"]
+
+export type KeyValuePair<T, S> = {
+  key: T
+  value: S
+}

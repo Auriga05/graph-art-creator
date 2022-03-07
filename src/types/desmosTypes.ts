@@ -1,7 +1,7 @@
 import { BaseExpression, TableExpression, Expression } from "./types";
 
 interface ExpressionAnalysis {
-  evaluation?: { type: string; value: number };
+  evaluation?: { type: "Number"; value: number };
 }
 export interface ControllerType {
   getItemModel: (_id: string) => BaseExpression | TableExpression;
@@ -13,7 +13,7 @@ export interface CalcType {
   expressionAnalysis: {
     [key: string]: ExpressionAnalysis;
   };
-  selectedExpressionId: string;
+  selectedExpressionId?: string;
   removeExpressions: (expressions: Partial<Expression>[]) => void;
   removeExpression: (expression: Expression) => void;
   setExpressions: (expressions: Partial<Expression>[]) => void;

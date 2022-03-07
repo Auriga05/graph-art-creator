@@ -19,31 +19,69 @@ declare const unsafeWindow: { Graph ?: typeof Graph
 export let virtualCalc: VirtualCalcClass;
 
 class App {
-  virtualCalc = new VirtualCalcClass(Calc);
   constructor() {
-    document.addEventListener('keydown', this.keyDownHandler, false);
-    document.addEventListener('keyup', this.keyUpHandler, false);
-    document.addEventListener('pointerup', this.mouseUpHandler, false);
-  
+    document.addEventListener('keydown', (e) => this.keyDownHandler(e), false);
+    document.addEventListener('keyup', (e) => this.keyUpHandler(e), false);
+    document.addEventListener('pointerup', (e) => this.mouseUpHandler(e), false);
+    document.addEventListener('pointerdown', (e) => this.mouseDownHandler(e), false);
+    
+    virtualCalc = new VirtualCalcClass(Calc)
     unsafeWindow.VirtualCalc = virtualCalc;
     unsafeWindow.Graph = Graph;
   }
 
   keyUpHandler(e: KeyboardEvent) {
-    e.preventDefault();
+    return
+    // this.onChange()
+    // e.preventDefault();
   }
 
   keyDownHandler(e: KeyboardEvent) {
+    this.onChange()
     if (e.altKey) {
       if (e.key === "1") {
-        console.log("circle")
+        virtualCalc.addGraph("circle")
+      } else if (e.key === "2") {
+        virtualCalc.addGraph("ellipse")
       }
+      
+      if (e.key === "a") {
+        virtualCalc.setFocus(null)
+      }
+      if (e.key === "x") {
+        virtualCalc.removeGraph()
+      }
+      e.preventDefault();
     }
-    e.preventDefault();
   }
 
   mouseUpHandler(e: PointerEvent) {
-    e.preventDefault();
+    this.onChange()
+    // e.preventDefault();
+  }
+
+  mouseDownHandler(e: PointerEvent) {
+    this.onChange()
+    // e.preventDefault();
+  }
+  
+  onChange() {
+    virtualCalc.onChange()
+    virtualCalc.updateVariables()
+  }
+  
+  getOffset() {
+    const graphContainer = document.querySelector('#graph-container') as HTMLElement
+    const graphContainerRect = graphContainer.getBoundingClientRect()
+    return {x: graphContainerRect.left, y: graphContainerRect.top}
+  }
+
+  pixelsToMath(point: {x: number, y: number}) {
+    const {x: xOffset, y: yOffset} = this.getOffset()
+    return virtualCalc.Calc.pixelsToMath({
+      x: point.x - xOffset,
+      y: point.y - yOffset,
+    });
   }
 }
 
