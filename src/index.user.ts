@@ -19,6 +19,8 @@ declare const unsafeWindow: { Graph ?: typeof Graph
 export let virtualCalc: VirtualCalcClass;
 
 class App {
+  isShifting = false;
+  keyDownFired = false;
   constructor() {
     document.addEventListener('keydown', (e) => this.keyDownHandler(e), false);
     document.addEventListener('keyup', (e) => this.keyUpHandler(e), false);
@@ -31,27 +33,45 @@ class App {
   }
 
   keyUpHandler(e: KeyboardEvent) {
-    return
+    if (!e.shiftKey) {
+      if (this.isShifting) {
+        e.preventDefault()
+        this.onChange()
+        virtualCalc.onUnshift()
+      }
+      this.isShifting = false
+    }
     // this.onChange()
     // e.preventDefault();
   }
 
   keyDownHandler(e: KeyboardEvent) {
-    this.onChange()
+    if (e.shiftKey) {
+      if (!this.isShifting) {
+        e.preventDefault()
+        this.onChange()
+        virtualCalc.onShift()
+      }
+      this.isShifting = true
+    }
     if (e.altKey) {
+      e.preventDefault();
       if (e.key === "1") {
-        virtualCalc.addGraph("circle")
+        this.onChange()
+        virtualCalc.addGraph("ellipse_or_hyperbola")
       } else if (e.key === "2") {
-        virtualCalc.addGraph("ellipse")
-      }
-      
-      if (e.key === "a") {
+        this.onChange()
+        virtualCalc.addGraph("bezier")
+      } else if (e.key === "a") {
+        this.onChange()
         virtualCalc.setFocus(null)
-      }
-      if (e.key === "x") {
+      } else if (e.key === "s") {
+        this.onChange()
+        virtualCalc.save()
+      } else if (e.key === "c") {
+        this.onChange()
         virtualCalc.removeGraph()
       }
-      e.preventDefault();
     }
   }
 
@@ -67,7 +87,6 @@ class App {
   
   onChange() {
     virtualCalc.onChange()
-    virtualCalc.updateVariables()
   }
   
   getOffset() {

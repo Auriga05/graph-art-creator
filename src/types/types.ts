@@ -1,15 +1,18 @@
-import { Graph } from "../classes/Graph";
-import { Circle } from "../graphs/Circle";
-import { Ellipse } from "../graphs/Ellipse";
+import { Bezier } from "../graphs/Bezier";
+import { EllipseOrHyperbola } from "../graphs/EllipseOrHyperbola";
 
-interface TableColumnMin {
+interface TableColumnInput {
   hidden: boolean;
   id: string;
   latex: string;
   values: string[];
 }
 
-interface TableColumn extends TableColumnMin {
+interface TableColumn {
+  hidden: boolean;
+  id: string;
+  latex: string;
+  values: string[];
   color: string;
   dragMode: "NONE" | "X" | "Y" | "XY";
   lineOpacity: string;
@@ -21,22 +24,30 @@ interface TableColumn extends TableColumnMin {
   pointStyle: "POINT" | "OPEN" | "CROSS";
 }
 
+export interface TableExpressionInput {
+  id: string;
+  type: "table";
+  columns: TableColumnInput[];
+}
+
 export interface TableExpression {
   id: string;
   type: "table";
-  columns: Partial<TableColumn>[];
+  columns: TableColumn[];
 }
 
-export interface MinBaseExpression {
-  id: string;
+export interface InputTableExpression {
+  id?: string;
+  type: "table";
+  columns: TableColumnInput[];
+}
+export interface InputBaseExpression {
+  id?: string;
   latex: string;
   type: "expression";
-}
-
-export interface InputBaseExpression extends MinBaseExpression {
-  color: string;
-  hidden: boolean;
-  label: string;
+  color?: string;
+  hidden?: boolean;
+  label?: string;
 }
 
 export interface BaseExpression extends InputBaseExpression {
@@ -44,14 +55,32 @@ export interface BaseExpression extends InputBaseExpression {
   label: string;
 }
 
-export type PartialInputBaseExpression = Partial<{
-  color: string;
-  hidden: boolean;
-  label: string;
-}> & MinBaseExpression
+export type Expression = TableExpression | BaseExpression;
 
-export type Expression = TableExpression | PartialInputBaseExpression;
+export type InputExpression = InputTableExpression | InputBaseExpression;
 
+export type SaveExpressionType = {
+	id: number
+  graphType: GraphTypeName
+	focused: boolean
+	shown: boolean
+	cropVariables?: {
+		minX: number,
+		minY: number,
+		maxX: number,
+		maxY: number,
+	},
+	variables: {
+		[key: string]: number
+	}
+}
+
+export type SaveType = {
+	graphs: SaveExpressionType[],
+	variables: { key: string, value: number }[],
+	lastId: number,
+	points: InputExpression[]
+}
 // export interface Expression {
 //   [key: string]: any;
 //   fillOpacity ?: string
@@ -137,7 +166,7 @@ export type GraphingOptions = {
   set?: boolean;
 };
 
-const GraphTypesClass = [Circle, Ellipse]
+const GraphTypesClass = [EllipseOrHyperbola, Bezier]
 
 export const GraphTypes = Object.fromEntries(GraphTypesClass.map(graphType => [graphType.graphType, graphType]))
 export type GraphTypeName = typeof GraphTypesClass[number]["graphType"]

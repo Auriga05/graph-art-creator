@@ -1,65 +1,69 @@
 import { virtualCalc } from "../index.user"
-import { MinBaseExpression } from "../types/types"
+import { InputBaseExpression, InputExpression, SaveExpressionType } from "../types/types"
 import { convertToVariableObjects } from "../utils/utils"
 
-type VariablesType = {
+type BaseVariablesType = {
   [key: string]: number,
-  h: number,
-  k: number,
 }
 export abstract class Graph {
   abstract getExpressionLatex(): string
-  abstract show(): void
-  abstract variables: VariablesType
-  abstract pointsLatex: string[]
-  static boundVariableNames = ['c_{x1}', 'c_{y1}', 'c_{x2}', 'c_{y2}']
+  abstract onShift(): void
+  abstract onUnshift(): void
+  abstract addGraph(): void
   id: number
   focused: boolean
   shown: boolean
-  cropVariables: {
-    minX: number,
-    minY: number,
-    maxX: number,
-    maxY: number,
-  }
-  constructor() {
-    this.id = virtualCalc.nextId()
-    this.cropVariables = {
-      minX: -8,
-      minY: -4,
-      maxX: 8,
-      maxY: 4,
-    }
+  _variables: BaseVariablesType
+  constructor(id?: number) {
+    this.id = id ?? virtualCalc.nextId()
     this.focused = false
     this.shown = false
+    this._variables = {}
   }
 
-  unstandardize() {
-    virtualCalc.setExpressions(virtualCalc.showVariables([
-      ...Object.keys(this.variables),
-      ...Graph.boundVariableNames
-    ]))
-    virtualCalc.setExpressions(this.showPoints())
+  set variables(value: BaseVariablesType) {
+    this._variables = value
+  }
+
+  get variables() {
+    return this._variables
   }
   
-	showPoints(): MinBaseExpression[] {
-    const points = this.pointsLatex.map((latex, index) => {
-      return {id: `graphpoint_${index}`, type: "expression" as const, latex}
+  getSymbolicExpressions(): InputExpression[] {
+    this.shown = true
+    return []
+  }
+
+  get allVariableNames() {
+    return [
+      ...Object.keys(this.variables)
+    ]
+  }
+  
+  getVariableExpressions(variableList: string[]): InputBaseExpression[] {
+    console.log(this.variables)
+		const variables = variableList.map(variableName => {
+			return {
+				type: "expression" as const,
+				latex: `${variableName}=${this.variables[variableName]}`,
+				id: `variable_${variableName}`,
+				hidden: true,
+			}
 		})
-    virtualCalc.points = points
-		return points
+		return variables
 	}
+  
+  showSymbolic() {
+    virtualCalc.setExpressions(this.getSymbolicExpressions())
+    virtualCalc.setExpressions(this.getVariableExpressions(this.allVariableNames))
+    virtualCalc.setExpressions(this.getHelperExpressions())
+  }
+
+	abstract getHelperExpressions(): InputExpression[]
 
   focus() {
-    virtualCalc.setVariables([
-      { key: 'c_{x1}', value: this.cropVariables.minX - this.variables.h },
-      { key: 'c_{y1}', value: this.cropVariables.minY - this.variables.k },
-      { key: 'c_{x2}', value: this.cropVariables.maxX - this.variables.h },
-      { key: 'c_{y2}', value: this.cropVariables.maxY - this.variables.k },
-    ])
-    this.focused = true
     virtualCalc.setVariables(convertToVariableObjects(this.variables))
-    this.unstandardize()
+    this.showSymbolic()
   }
 
   defocus() {
@@ -69,14 +73,12 @@ export abstract class Graph {
 
   update () {
     if (this.focused) {
-      if (!this.shown) {
-        this.show()
-      }
       this.variables = Object.fromEntries(Object.keys(this.variables).map(
-          variableName => [variableName, virtualCalc.variables[variableName].value]
-      )) as VariablesType
-      virtualCalc.recalculateBoundVariables()
-      this.cropVariables = virtualCalc.getMinMaxBoundVariables()
+        variableName => [variableName, virtualCalc.variables[variableName].value]
+        )) as BaseVariablesType
+        if (!this.shown) {
+          virtualCalc.setExpressions(this.getSymbolicExpressions())
+        }
     }
   }
 
@@ -84,12 +86,8 @@ export abstract class Graph {
     return `graph_${this.id}`
   }
 
-  standardizedBoundsLatex() {
-    const {minX, minY, maxX, maxY} = virtualCalc.getMinMaxBoundVariables()
-    return `\\left\\{${minX}<x<${maxX}\\right\\}\\left\\{${minY}<y<${maxY}\\right\\}`
-  }
-
   standardize() {
+    virtualCalc.setExpressions(virtualCalc.getVariableExpressions(this.allVariableNames))
     virtualCalc.removeGraphPoints()
     virtualCalc.setExpressions([
       {
@@ -100,8 +98,24 @@ export abstract class Graph {
     ])
   }
 
-  delete() {
-    this.defocus()
+  remove() {
+    this.focused = false
     virtualCalc.removeGraphPoints()
+    const expression = virtualCalc.getExpression(this.getGraphId())
+    if (expression) {
+      virtualCalc.removeExpressions([expression])
+    } else {
+      throw new Error(`Failed removing expression of graph ${this.getGraphId()}`)
+    }
+  }
+
+  toObject(): SaveExpressionType {
+    return {
+      id: this.id,
+      focused: this.focused,
+      shown: this.shown,
+      variables: this.variables,
+      graphType: "ellipse_or_hyperbola",
+    }
   }
 }
